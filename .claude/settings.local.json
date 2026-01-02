@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(git clone:*)",
+      "Bash(cd /Users/onuroztaskiran/FE\\\\ Apps/capacitor && npm i:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm i:*)",
+      "Bash(npx shadcn@latest add:*)"
+    ]
+  }
+}

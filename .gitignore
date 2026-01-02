@@ -20,6 +20,9 @@
 # production
 /build
 
+__example__flux-master
+__example__fluxos-frontend-master
+
 # misc
 .DS_Store
 *.pem
