@@ -73,16 +73,19 @@ export async function GET(request: NextRequest) {
 
     if (contentType.includes('application/json')) {
       const data = await response.json();
+      // Check if this is a Flux API response (has status field) or raw JSON file content
       if (data.status === 'error') {
         return NextResponse.json({
           status: 'error',
           message: data.message || data.data?.message || 'Failed to download file',
         });
       }
-      // If it's JSON success, return the data
+      // If it's a Flux API success response, return data.data
+      // Otherwise it's a raw JSON file - stringify it back
+      const isFluxResponse = typeof data.status === 'string' && 'data' in data;
       return NextResponse.json({
         status: 'success',
-        data: data.data,
+        data: isFluxResponse ? data.data : JSON.stringify(data, null, 2),
         contentType: 'application/json',
       });
     }

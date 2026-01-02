@@ -12,6 +12,14 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
@@ -24,6 +32,7 @@ import {
   listFiles,
   downloadFile,
   saveFile,
+  deleteFile,
   formatFileSize,
   isTextFile,
   type FileInfo,
@@ -36,6 +45,8 @@ import {
   File,
   FileText,
   FileCode,
+  FileCode2,
+  FileTerminal,
   Image,
   ChevronRight,
   Home,
@@ -47,6 +58,10 @@ import {
   ArrowLeft,
   Server,
   X,
+  Trash2,
+  Square,
+  CheckSquare,
+  MinusSquare,
 } from 'lucide-react';
 import {
   createHighlighter,
@@ -224,6 +239,8 @@ function getFileIcon(file: FileInfo) {
   const codeExts = ['js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'java', 'c', 'cpp'];
   const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
 
+  if (ext === 'conf') return <FileTerminal className="h-4 w-4 text-purple-800" />;
+  if (ext === 'php') return <FileCode2 className="h-4 w-4 text-purple-800" />;
   if (codeExts.includes(ext)) return <FileCode className="h-4 w-4 text-blue-500" />;
   if (imageExts.includes(ext)) return <Image className="h-4 w-4 text-green-500" />;
   if (['txt', 'md', 'json', 'yaml', 'yml', 'xml'].includes(ext))
@@ -243,6 +260,14 @@ export function FileBrowser({ appName }: FileBrowserProps) {
   const [selectedNode, setSelectedNode] = useState<string>('');
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string>('');
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteProgress, setDeleteProgress] = useState<{
+    done: number;
+    total: number;
+    failed: string[];
+  } | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { zelidauth } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -328,6 +353,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
         ? `/${file.name}`
         : `${currentPath}/${file.name}`;
       setCurrentPath(newPath);
+      setSelectedItems(new Set()); // Clear selection on navigation
     }
   };
 
@@ -335,6 +361,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
     const parts = currentPath.split('/').filter(Boolean);
     parts.pop();
     setCurrentPath(parts.length === 0 ? '/' : `/${parts.join('/')}`);
+    setSelectedItems(new Set()); // Clear selection on navigation
   };
 
   const handleOpenFile = async (file: FileInfo, viewOnly: boolean = false) => {
@@ -417,6 +444,85 @@ export function FileBrowser({ appName }: FileBrowserProps) {
     setIsViewOnly(false);
   };
 
+  // Selection handlers
+  const toggleSelection = (fileName: string) => {
+    setSelectedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(fileName)) {
+        next.delete(fileName);
+      } else {
+        next.add(fileName);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedItems.size === files.length) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(files.map(f => f.name)));
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedItems(new Set());
+  };
+
+  // Delete handlers
+  const deleteInBatches = async (items: string[], concurrency = 5) => {
+    const results = { success: 0, failed: [] as string[] };
+
+    for (let i = 0; i < items.length; i += concurrency) {
+      const batch = items.slice(i, i + concurrency);
+      const responses = await Promise.allSettled(
+        batch.map(name => {
+          const filePath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
+          return deleteFile(zelidauth!, appName, activeComponent, activeNode, filePath);
+        })
+      );
+
+      responses.forEach((res, idx) => {
+        if (res.status === 'fulfilled' && res.value.status === 'success') {
+          results.success++;
+        } else {
+          results.failed.push(batch[idx]);
+        }
+      });
+
+      setDeleteProgress({ done: i + batch.length, total: items.length, failed: results.failed });
+    }
+
+    return results;
+  };
+
+  const handleBulkDelete = async () => {
+    if (!zelidauth || selectedItems.size === 0) return;
+
+    setShowDeleteConfirm(false);
+    setIsDeleting(true);
+    setDeleteProgress({ done: 0, total: selectedItems.size, failed: [] });
+
+    try {
+      const items = Array.from(selectedItems);
+      const results = await deleteInBatches(items);
+
+      if (results.failed.length === 0) {
+        toast.success(`Deleted ${results.success} item${results.success > 1 ? 's' : ''}`);
+      } else {
+        toast.warning(`Deleted ${results.success}, failed ${results.failed.length}`);
+      }
+
+      setSelectedItems(new Set());
+      refetch();
+    } catch (error) {
+      toast.error('Delete operation failed');
+    } finally {
+      setIsDeleting(false);
+      setDeleteProgress(null);
+    }
+  };
+
   const pathParts = currentPath.split('/').filter(Boolean);
   const files = data?.data?.files || [];
   const isInitialLoading = specLoading || locationsLoading;
@@ -463,7 +569,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
 
   return (
     <>
-      <Card className='gap-0'>
+      <Card className='gap-0 flex-1'>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -493,7 +599,10 @@ export function FileBrowser({ appName }: FileBrowserProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                onClick={() => setCurrentPath('/')}
+                onClick={() => {
+                  setCurrentPath('/');
+                  setSelectedItems(new Set());
+                }}
               >
                 <Home className="h-4 w-4" />
               </Button>
@@ -507,6 +616,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                     onClick={() => {
                       const newPath = '/' + pathParts.slice(0, idx + 1).join('/');
                       setCurrentPath(newPath);
+                      setSelectedItems(new Set());
                     }}
                   >
                     {part}
@@ -521,6 +631,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   onValueChange={(val) => {
                     setSelectedComponent(val);
                     setCurrentPath('/');
+                    setSelectedItems(new Set());
                   }}
                 >
                   <SelectTrigger className="w-[180px] h-9 text-xs">
@@ -541,6 +652,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                 onValueChange={(val) => {
                   setSelectedNode(val);
                   setCurrentPath('/');
+                  setSelectedItems(new Set());
                 }}
               >
                 <SelectTrigger className="w-[200px] h-9 text-xs">
@@ -562,6 +674,60 @@ export function FileBrowser({ appName }: FileBrowserProps) {
         </CardHeader>
 
         <CardContent>
+          {/* Bulk Action Bar */}
+          {files.length > 0 && (
+            <div className="flex items-center justify-between h-20 border-b">
+              <div className="flex items-center gap-2 pl-2">
+                <button
+                  onClick={toggleSelectAll}
+                  className="p-1 flex items-center gap-3"
+                  disabled={isDeleting}
+                >
+                  {selectedItems.size === 0 ? (
+                    <Square className="h-4 w-4 text-muted-foreground" />
+                  ) : selectedItems.size === files.length ? (
+                    <CheckSquare className="h-4 w-4 text-primary" />
+                  ) : (
+                    <MinusSquare className="h-4 w-4 text-primary" />
+                  )}
+                  <span className="text-sm text-muted-foreground">
+                    {selectedItems.size > 0 ? `${selectedItems.size} selected` : 'Select all'}
+                  </span>
+                </button>
+              </div>
+              {selectedItems.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSelection}
+                    disabled={isDeleting}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting && deleteProgress ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {deleteProgress.done}/{deleteProgress.total}
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -583,7 +749,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
               This directory is empty.
             </div>
           ) : (
-            <ScrollArea className="h-[calc(100vh-32rem)] relative">
+            <ScrollArea className="min-h-[440px] h-[calc(100vh-32rem)] relative">
               <div className="sticky top-0 h-8 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none -mb-8"></div>
               <div className="space-y-1 pt-6">
                 {files
@@ -595,7 +761,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   .map((file) => (
                     <div
                       key={file.name}
-                      className={`flex items-center justify-between p-2 rounded-lg hover:bg-muted group select-none ${file.isDirectory ? 'cursor-pointer' : ''}`}
+                      className={`flex items-center justify-between p-2 rounded-lg hover:bg-muted group select-none ${selectedItems.has(file.name) ? 'bg-muted/50' : ''} ${file.isDirectory ? 'cursor-pointer' : ''}`}
                       onClick={() => handleNavigate(file)}
                       onDoubleClick={() => {
                         if (file.isDirectory) {
@@ -605,22 +771,38 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                         }
                       }}
                     >
-                      <button
-                        className={`flex items-center gap-3 flex-1 text-left ${file.isDirectory ? 'cursor-pointer' : 'cursor-auto'}`}
-                        onClick={() => handleNavigate(file)}
-                      >
-                        {getFileIcon(file)}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {file.name}
-                          </p>
-                          {!file.isDirectory && (
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(file.size)}
-                            </p>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleSelection(file.name);
+                          }}
+                          className="p-1 hover:bg-muted rounded shrink-0"
+                          disabled={isDeleting}
+                        >
+                          {selectedItems.has(file.name) ? (
+                            <CheckSquare className="h-4 w-4 text-primary" />
+                          ) : (
+                            <Square className="h-4 w-4 text-muted-foreground" />
                           )}
-                        </div>
-                      </button>
+                        </button>
+                        <button
+                          className={`flex items-center gap-3 flex-1 text-left min-w-0 ${file.isDirectory ? 'cursor-pointer' : 'cursor-auto'}`}
+                          onClick={() => handleNavigate(file)}
+                        >
+                          {getFileIcon(file)}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">
+                              {file.name}
+                            </p>
+                            {!file.isDirectory && (
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(file.size)}
+                              </p>
+                            )}
+                          </div>
+                        </button>
+                      </div>
 
                       {!file.isDirectory && isTextFile(file.name) && (
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -652,7 +834,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
 
       <Sheet open={!!editingFile} onOpenChange={handleCloseEditor}>
         <SheetContent side="left" className="w-full !max-w-[1200px] flex flex-col">
-          <SheetHeader>
+          <SheetHeader className='pb-0'>
             <SheetTitle className="flex items-center gap-2">
               {isViewOnly ? <Eye className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
               {editingFile?.name}
@@ -724,13 +906,13 @@ export function FileBrowser({ appName }: FileBrowserProps) {
             </div>
           )}
 
-          <SheetFooter className="mt-auto pt-4 flex-row gap-2">
+          <SheetFooter className="mt-auto pt-0 flex-row gap-2">
             <Button variant="outline" onClick={handleCloseEditor}>
               <X className="h-4 w-4 mr-2" />
               {isViewOnly ? 'Close' : 'Cancel'}
             </Button>
             {!isViewOnly && (
-              <Button onClick={handleSaveFile} disabled={isSaving}>
+              <Button onClick={handleSaveFile} disabled={isSaving} className='flex-1'>
                 {isSaving ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
@@ -742,6 +924,35 @@ export function FileBrowser({ appName }: FileBrowserProps) {
           </SheetFooter>
         </SheetContent>
       </Sheet>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Delete {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''}?</DialogTitle>
+            <DialogDescription>
+              This action cannot be undone. The following will be permanently deleted:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-32 overflow-y-auto text-sm text-muted-foreground">
+            {Array.from(selectedItems).slice(0, 10).map(name => (
+              <div key={name} className="truncate">• {name}</div>
+            ))}
+            {selectedItems.size > 10 && (
+              <div className="text-xs mt-1">...and {selectedItems.size - 10} more</div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleBulkDelete}>
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

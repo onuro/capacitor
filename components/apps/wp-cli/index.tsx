@@ -91,14 +91,14 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
     <div className="space-y-4">
       {/* Header with node selection */}
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <span className="text-2xl font-bold text-blue-600">WP</span>
               WordPress Management
             </CardTitle>
             <Select value={selectedNode} onValueChange={setSelectedNode}>
-              <SelectTrigger className="w-[220px]">
+              <SelectTrigger>
                 <Server className="h-4 w-4 mr-2" />
                 <SelectValue placeholder="Select node" />
               </SelectTrigger>
@@ -112,7 +112,7 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
             </Select>
           </div>
         </CardHeader>
-        {locations.length > 1 && (
+        {/* {locations.length > 1 && (
           <CardContent className="pt-0">
             <Alert>
               <AlertTriangle className="h-4 w-4" />
@@ -122,7 +122,7 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
               </AlertDescription>
             </Alert>
           </CardContent>
-        )}
+        )} */}
       </Card>
 
       {/* Management Tabs */}

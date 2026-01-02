@@ -111,15 +111,13 @@ export default function AppDetailPage({ params }: PageProps) {
   return (
     <main className="container py-8">
       <div className="mb-6">
-        <Button asChild variant="ghost" size="sm" className="mb-4">
-          <Link href="/apps">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Apps
-          </Link>
-        </Button>
-
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex items-start gap-4">
+          <div className="flex items-start gap-3">
+            <Button asChild variant="ghost" size="icon" className="shrink-0 -ml-2">
+              <Link href="/apps">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+            </Button>
             <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
               <Box className="h-7 w-7 text-primary" />
             </div>
@@ -194,7 +192,7 @@ export default function AppDetailPage({ params }: PageProps) {
           <LogViewer appName={appName} />
         </TabsContent>
 
-        <TabsContent value="files">
+        <TabsContent value="files" className='flex-col'>
           <FileBrowser appName={appName} />
         </TabsContent>
 
@@ -214,7 +212,7 @@ export default function AppDetailPage({ params }: PageProps) {
 
                 <div>
                   <h4 className="font-medium mb-2">Containers</h4>
-                  <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-3">
                     {app.compose.map((component, idx) => (
                       <div
                         key={idx}

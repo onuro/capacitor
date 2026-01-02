@@ -148,24 +148,37 @@ export async function uploadFile(
 }
 
 /**
- * Delete a file from app storage
+ * Delete a file or folder from app storage (via proxy)
+ * Uses Flux's removeobject endpoint which handles recursive folder deletion
+ * @param zelidauth - Auth token
  * @param appName - Name of the application
- * @param filePath - Path to the file to delete
+ * @param component - Component name
+ * @param nodeIp - Node IP
+ * @param filePath - Path to the file or folder to delete
  */
 export async function deleteFile(
   zelidauth: string,
   appName: string,
+  component: string,
+  nodeIp: string,
   filePath: string
 ): Promise<FluxApiResponse<string>> {
-  const encodedPath = encodeURIComponent(filePath);
-  const response = await apiClient.delete<FluxApiResponse<string>>(
-    `/apps/appfiledelete/${appName}/${encodedPath}`,
-    {
-      headers: { zelidauth },
-      timeout: 30000,
-    }
-  );
-  return response.data;
+  const response = await fetch('/api/flux/files/delete', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+      zelidauth,
+    },
+    body: JSON.stringify({
+      nodeIp,
+      appName,
+      component,
+      filePath,
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+
+  return response.json();
 }
 
 /**

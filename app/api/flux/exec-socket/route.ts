@@ -158,14 +158,50 @@ function executeViaSocket(
           // Reset end timeout on each output
           if (endTimeoutId) clearTimeout(endTimeoutId);
 
-          // If we see the command output (not just shell prompt), wait for more
-          // After 3s of no output, consider it done (longer for WP-CLI commands)
-          endTimeoutId = setTimeout(() => {
-            if (output.length > 0) {
-              console.log('No more output after 3s, finishing');
-              finish({ status: 'success', data: output });
+          // Detect if this is a JSON command
+          const cmdString = Array.isArray(cmd) ? cmd.join(' ') : cmd;
+          const isJsonCommand = cmdString.includes('--format=json');
+
+          // Smart completion detection
+          const checkCompletion = (): boolean => {
+            // Check for JSON completion
+            if (isJsonCommand) {
+              const jsonMatch = output.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+              if (jsonMatch) {
+                try {
+                  JSON.parse(jsonMatch[0]);
+                  return true; // Valid JSON found
+                } catch {
+                  // JSON not complete yet
+                }
+              }
             }
-          }, 3000);
+
+            // Check for shell prompt return (command finished)
+            const lines = output.split('\n');
+            const lastLine = lines[lines.length - 1].trim();
+            if (lastLine === '#' || lastLine === '$') {
+              return true;
+            }
+
+            return false;
+          };
+
+          // If completion detected, finish sooner
+          if (checkCompletion()) {
+            console.log('Completion detected, finishing shortly');
+            endTimeoutId = setTimeout(() => {
+              finish({ status: 'success', data: output });
+            }, 500); // Short delay to catch any trailing data
+          } else {
+            // Longer timeout (10s) for WP CLI commands that may take time
+            endTimeoutId = setTimeout(() => {
+              if (output.length > 0) {
+                console.log('No more output after 10s, finishing');
+                finish({ status: 'success', data: output });
+              }
+            }, 10000);
+          }
         }
       });
 

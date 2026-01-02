@@ -134,7 +134,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
 
   return (
     <Card>
-      <CardHeader className="pb-3">
+      <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <CardTitle className="flex items-center gap-2">
             <FileWarning className="h-5 w-5 text-orange-500" />
@@ -170,7 +170,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
       <CardContent className="space-y-4">
         {/* Log Type Tabs */}
         <Tabs value={activeLog} onValueChange={(v) => setActiveLog(v as LogType)}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="">
             {LOG_TABS.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id} className="flex items-center gap-2">
                 {tab.icon}
