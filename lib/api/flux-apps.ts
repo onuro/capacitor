@@ -7,6 +7,7 @@ export interface FluxApp {
   owner: string;
   hash: string;
   height: number;
+  version: number;
   compose: {
     name: string;
     repotag: string;

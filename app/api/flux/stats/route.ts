@@ -135,16 +135,24 @@ export async function GET(request: NextRequest) {
           'Content-Type': 'application/json',
         };
         if (zelidauth) {
-          // zelidauth format is "zelid:signature:loginPhrase"
-          // Nodes expect it as JSON object
-          const parts = zelidauth.split(':');
-          if (parts.length >= 3) {
-            const authObj = {
-              zelid: parts[0],
-              signature: parts[1],
-              loginPhrase: parts.slice(2).join(':'),
-            };
-            headers['zelidauth'] = JSON.stringify(authObj);
+          // Parse zelidauth and convert to JSON for nodes
+          // Supports both query string format (zelid=xxx&...) and colon format (zelid:sig:phrase)
+          const params = new URLSearchParams(zelidauth);
+          let zelid = params.get('zelid');
+          let signature = params.get('signature');
+          let loginPhrase = params.get('loginPhrase');
+
+          if (!zelid || !signature || !loginPhrase) {
+            const parts = zelidauth.split(':');
+            if (parts.length >= 3) {
+              zelid = parts[0];
+              signature = parts[1];
+              loginPhrase = parts.slice(2).join(':');
+            }
+          }
+
+          if (zelid && signature && loginPhrase) {
+            headers['zelidauth'] = JSON.stringify({ zelid, signature, loginPhrase });
           } else {
             headers['zelidauth'] = zelidauth;
           }

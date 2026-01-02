@@ -11,16 +11,25 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Helper to convert colon-separated zelidauth to JSON format
-function zelidauthToJson(zelidauth: string): string {
+// Helper to normalize zelidauth to query string format
+// Supports both colon format (zelid:sig:phrase) and query string format
+function normalizeZelidauth(zelidauth: string): string {
+  // Check if already query string format
+  const params = new URLSearchParams(zelidauth);
+  if (params.get('zelid') && params.get('signature') && params.get('loginPhrase')) {
+    return zelidauth;
+  }
+
+  // Try colon format
   const parts = zelidauth.split(':');
   if (parts.length >= 3) {
-    return JSON.stringify({
-      zelid: parts[0],
-      signature: parts[1],
-      loginPhrase: parts.slice(2).join(':'),
-    });
+    const newParams = new URLSearchParams();
+    newParams.set('zelid', parts[0]);
+    newParams.set('signature', parts[1]);
+    newParams.set('loginPhrase', parts.slice(2).join(':'));
+    return newParams.toString();
   }
+
   return zelidauth;
 }
 
@@ -28,11 +37,11 @@ function zelidauthToJson(zelidauth: string): string {
 apiClient.interceptors.request.use(
   (config) => {
     // Add zelidauth header if available in localStorage
-    // Convert to JSON format for direct API calls
+    // Normalizes to query string format (zelid=xxx&signature=yyy&loginPhrase=zzz)
     if (typeof window !== 'undefined') {
       const zelidauth = localStorage.getItem('zelidauth');
       if (zelidauth && config.headers) {
-        config.headers['zelidauth'] = zelidauthToJson(zelidauth);
+        config.headers['zelidauth'] = normalizeZelidauth(zelidauth);
       }
     }
     return config;

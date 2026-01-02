@@ -14,19 +14,115 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getAppLogs, parseLogEntries } from '@/lib/api/flux-logs';
+import { getAppLocations, getAppSpecification } from '@/lib/api/flux-apps';
 import { useAuthStore } from '@/stores/auth';
-import { Loader2, Search, Download, RefreshCw, Terminal } from 'lucide-react';
+import { Loader2, Search, Download, RefreshCw, Terminal, Server, Box } from 'lucide-react';
 
 interface LogViewerProps {
   appName: string;
+}
+
+// Helper component to colorize HTTP status codes in log messages
+function LogMessage({ message }: { message: string }) {
+  // Match HTTP status codes (3-digit numbers at end of line or before whitespace)
+  const statusCodeRegex = /\s(\d{3})(\s|$)/g;
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  while ((match = statusCodeRegex.exec(message)) !== null) {
+    const statusCode = parseInt(match[1], 10);
+    const matchStart = match.index + 1; // +1 to skip the leading space
+    const matchEnd = matchStart + 3;
+
+    // Add text before the status code
+    if (matchStart > lastIndex) {
+      parts.push(message.slice(lastIndex, matchStart));
+    }
+
+    // Determine color based on status code range
+    let colorClass = '';
+    if (statusCode >= 200 && statusCode < 300) {
+      colorClass = 'text-green-500';
+    } else if (statusCode >= 300 && statusCode < 400) {
+      colorClass = 'text-blue-400';
+    } else if (statusCode >= 400 && statusCode < 500) {
+      colorClass = 'text-yellow-500';
+    } else if (statusCode >= 500) {
+      colorClass = 'text-red-500';
+    }
+
+    // Add the colorized status code
+    parts.push(
+      <span key={matchStart} className={`font-semibold ${colorClass}`}>
+        {match[1]}
+      </span>
+    );
+
+    lastIndex = matchEnd;
+  }
+
+  // Add remaining text
+  if (lastIndex < message.length) {
+    parts.push(message.slice(lastIndex));
+  }
+
+  // If no status codes found, return plain message
+  if (parts.length === 0) {
+    return <span className="break-all">{message}</span>;
+  }
+
+  return <span className="break-all">{parts}</span>;
 }
 
 export function LogViewer({ appName }: LogViewerProps) {
   const [lines, setLines] = useState('100');
   const [filter, setFilter] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
+  const [selectedNode, setSelectedNode] = useState<string>('');
+  const [selectedComponent, setSelectedComponent] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const zelidauth = useAuthStore((state) => state.zelidauth);
+
+  // Fetch app specification to get compose info
+  const { data: appSpecData } = useQuery({
+    queryKey: ['appSpecification', appName],
+    queryFn: () => getAppSpecification(appName),
+    staleTime: 60000,
+  });
+
+  const appSpec = appSpecData?.data;
+  const isComposeApp = appSpec && appSpec.version >= 4 && appSpec.compose?.length > 0;
+  const components = appSpec?.compose?.map((c) => c.name) || [];
+
+  // Fetch app locations (instances)
+  const { data: locationsData } = useQuery({
+    queryKey: ['appLocations', appName],
+    queryFn: () => getAppLocations(appName),
+    staleTime: 30000,
+  });
+
+  const locations = locationsData?.data || [];
+  const nodeIp = selectedNode || locations[0]?.ip;
+
+  // Auto-select first node when locations load
+  useEffect(() => {
+    if (locations.length > 0 && !selectedNode) {
+      setSelectedNode(locations[0].ip);
+    }
+  }, [locations, selectedNode]);
+
+  // Auto-select first component for compose apps
+  useEffect(() => {
+    if (isComposeApp && components.length > 0 && !selectedComponent) {
+      setSelectedComponent(components[0]);
+    }
+  }, [isComposeApp, components, selectedComponent]);
+
+  // Build container name: componentName_appName for compose apps, appName for v3 and below
+  const containerName = isComposeApp && selectedComponent
+    ? `${selectedComponent}_${appName}`
+    : appName;
 
   const {
     data,
@@ -35,11 +131,11 @@ export function LogViewer({ appName }: LogViewerProps) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['appLogs', appName, lines],
-    queryFn: () => getAppLogs(appName, parseInt(lines), zelidauth || undefined),
+    queryKey: ['appLogs', containerName, nodeIp, lines],
+    queryFn: () => getAppLogs(nodeIp!, containerName, parseInt(lines), zelidauth || undefined),
     refetchInterval: 10000,
     staleTime: 5000,
-    enabled: !!zelidauth,
+    enabled: !!zelidauth && !!nodeIp && (!isComposeApp || !!selectedComponent),
   });
 
   const logEntries = data?.data ? parseLogEntries(data.data) : [];
@@ -61,7 +157,7 @@ export function LogViewer({ appName }: LogViewerProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${appName}-logs-${new Date().toISOString()}.txt`;
+    a.download = `${containerName}-logs-${new Date().toISOString()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -75,6 +171,36 @@ export function LogViewer({ appName }: LogViewerProps) {
             Application Logs
           </CardTitle>
           <div className="flex items-center gap-2">
+            {isComposeApp && components.length > 1 && (
+              <Select value={selectedComponent} onValueChange={setSelectedComponent}>
+                <SelectTrigger className="w-40">
+                  <Box className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Component" />
+                </SelectTrigger>
+                <SelectContent>
+                  {components.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {locations.length > 1 && (
+              <Select value={selectedNode} onValueChange={setSelectedNode}>
+                <SelectTrigger className="w-48">
+                  <Server className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Select node" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc, idx) => (
+                    <SelectItem key={loc.ip} value={loc.ip}>
+                      {loc.ip} {idx === 0 ? '(primary)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={lines} onValueChange={setLines}>
               <SelectTrigger className="w-24">
                 <SelectValue />
@@ -114,6 +240,10 @@ export function LogViewer({ appName }: LogViewerProps) {
           <div className="text-center py-8 text-muted-foreground">
             Please log in to view application logs.
           </div>
+        ) : !nodeIp ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No running instances found. Start the app to view logs.
+          </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -136,7 +266,7 @@ export function LogViewer({ appName }: LogViewerProps) {
                     <span className="text-muted-foreground shrink-0 w-[180px]">
                       {new Date(log.timestamp).toLocaleString()}
                     </span>
-                    <span className="break-all">{log.message}</span>
+                    <LogMessage message={log.message} />
                   </div>
                 ))
               )}

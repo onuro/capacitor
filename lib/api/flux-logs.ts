@@ -1,6 +1,3 @@
-import apiClient from './client';
-import { zelidauthToJson } from './auth';
-
 export interface FluxApiResponse<T> {
   status: 'success' | 'error';
   data?: T;
@@ -13,42 +10,33 @@ export interface AppLogEntry {
 }
 
 /**
- * Get application logs
+ * Get application logs from a specific node via proxy
+ * @param nodeIp - IP address of the Flux node
  * @param appName - Name of the application
  * @param lines - Number of lines to retrieve (default 100)
- * @param zelidauth - Authentication token (colon format, will be converted to JSON)
+ * @param zelidauth - Authentication token
  */
 export async function getAppLogs(
+  nodeIp: string,
   appName: string,
   lines: number = 100,
   zelidauth?: string
 ): Promise<FluxApiResponse<string>> {
-  const response = await apiClient.get<FluxApiResponse<string>>(
-    `/apps/applog/${appName}/${lines}`,
-    {
-      timeout: 30000,
-      headers: zelidauth ? { zelidauth: zelidauthToJson(zelidauth) } : undefined,
-    }
-  );
-  return response.data;
-}
+  if (!zelidauth) {
+    return { status: 'error', message: 'Authentication required' };
+  }
 
-/**
- * Get application logs from a specific node
- * @param nodeIp - IP address of the Flux node
- * @param appName - Name of the application
- * @param lines - Number of lines to retrieve
- */
-export async function getAppLogsFromNode(
-  nodeIp: string,
-  appName: string,
-  lines: number = 100
-): Promise<FluxApiResponse<string>> {
-  const response = await apiClient.get<FluxApiResponse<string>>(
-    `http://${nodeIp}:16127/apps/applog/${appName}/${lines}`,
-    { timeout: 30000 }
-  );
-  return response.data;
+  const params = new URLSearchParams({
+    nodeIp,
+    appName,
+    lines: String(lines),
+  });
+
+  const response = await fetch(`/api/flux/logs?${params}`, {
+    headers: { zelidauth },
+  });
+
+  return response.json();
 }
 
 /**
@@ -74,19 +62,3 @@ export function parseLogEntries(rawLogs: string | unknown): AppLogEntry[] {
   });
 }
 
-/**
- * Get debug information for an app (more detailed logs)
- */
-export async function getAppDebug(
-  zelidauth: string,
-  appName: string
-): Promise<FluxApiResponse<string>> {
-  const response = await apiClient.get<FluxApiResponse<string>>(
-    `/apps/appdebug/${appName}`,
-    {
-      headers: { zelidauth },
-      timeout: 30000,
-    }
-  );
-  return response.data;
-}
