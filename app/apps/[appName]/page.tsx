@@ -11,6 +11,7 @@ import { LifecycleControls } from '@/components/apps/lifecycle-controls';
 import { LogViewer } from '@/components/apps/log-viewer';
 import { MetricsDashboard } from '@/components/apps/metrics-dashboard';
 import { FileBrowser } from '@/components/apps/file-browser';
+import { WPCliDashboard, isWordPressApp } from '@/components/apps/wp-cli';
 import { getAppSpecification, getAppLocations } from '@/lib/api/flux-apps';
 import {
   ArrowLeft,
@@ -84,6 +85,7 @@ export default function AppDetailPage({ params }: PageProps) {
   const totalCpu = app.compose.reduce((sum, c) => sum + c.cpu, 0);
   const totalRam = app.compose.reduce((sum, c) => sum + c.ram, 0);
   const totalHdd = app.compose.reduce((sum, c) => sum + c.hdd, 0);
+  const showWpTab = isWordPressApp(app);
 
   return (
     <main className="container py-8">
@@ -136,6 +138,7 @@ export default function AppDetailPage({ params }: PageProps) {
             <TabsTrigger value="logs">Logs</TabsTrigger>
             <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="config">Configuration</TabsTrigger>
+            {showWpTab && <TabsTrigger value="wordpress">WordPress</TabsTrigger>}
           </TabsList>
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -235,6 +238,12 @@ export default function AppDetailPage({ params }: PageProps) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {showWpTab && (
+          <TabsContent value="wordpress">
+            <WPCliDashboard appName={appName} />
+          </TabsContent>
+        )}
       </Tabs>
     </main>
   );

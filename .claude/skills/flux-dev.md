@@ -83,6 +83,47 @@ Base URL: `https://api.runonflux.io` (global) or `http://{nodeIp}:16127` (direct
 
 **IMPORTANT**: Container names follow the format `{componentName}_{appName}` (e.g., `wp_wordpress123`)
 
+#### Command Execution
+
+**REST Endpoint (BROKEN - DO NOT USE)**
+- `POST /apps/appexec` - Executes command in container (has timeout bug, hangs indefinitely)
+
+**Socket.io Method (RECOMMENDED)**
+
+Use socket.io to connect to the node's terminal namespace for reliable command execution:
+
+```typescript
+// Socket URL format
+const [host, port = '16127'] = nodeIp.split(':');
+const dashedHost = host.replace(/\./g, '-');
+const socketUrl = `https://${dashedHost}-${port}.node.api.runonflux.io`;
+
+// Connect to terminal namespace
+const socket = io(socketUrl + '/terminal', {
+  transports: ['websocket', 'polling'],
+  timeout: 10000,
+  reconnection: false,
+});
+
+// Execute command
+socket.on('connect', () => {
+  // Start shell: exec(zelidauth, containerName, cmd, env, user)
+  socket.emit('exec', authString, 'wp_appName', '/bin/sh', '', '');
+
+  // After shell starts, send command
+  setTimeout(() => {
+    socket.emit('cmd', 'wp plugin list --allow-root --format=json && exit 0\n');
+  }, 500);
+});
+
+// Receive output
+socket.on('show', (data: string) => {
+  // Accumulate output, wait for 3s of silence to determine completion
+});
+```
+
+The project has a Next.js API proxy at `/api/flux/exec-socket` that handles this.
+
 #### File System (Direct to Node)
 
 These endpoints must be called directly on Flux nodes (CORS issues from browser):
@@ -158,6 +199,78 @@ const primaryNode = sortedLocations[0];
 
 7. **Upload Response**: File upload returns streaming progress data, not JSON. Check HTTP status for success.
 
+### WordPress/WP-CLI Integration
+
+The project includes a full WordPress management dashboard for FluxCloud WordPress apps (`runonflux/wp-nginx:latest`).
+
+#### WordPress Detection
+
+```typescript
+function isWordPressApp(app: FluxApp): boolean {
+  return app.compose?.some(c => c.repotag.includes('runonflux/wp-nginx')) ?? false;
+}
+```
+
+#### WP-CLI Commands
+
+WP-CLI runs in the `wp` component of WordPress apps. Commands must:
+- Run from `/var/www/html` (WordPress installation directory)
+- Include `--allow-root` flag (container runs as root)
+- Use `--format=json` for parseable output
+
+```typescript
+// Build WP-CLI command
+function buildWpCommand(subcommand: string, options: string[] = []): string {
+  const wpCommand = ['wp', subcommand, ...options, '--allow-root'].join(' ');
+  return `cd /var/www/html && ${wpCommand}`;
+}
+
+// Example: List plugins
+const cmd = 'cd /var/www/html && wp plugin list --allow-root --format=json';
+```
+
+#### Available WP-CLI Functions
+
+**Plugins** (`lib/api/flux-wp-cli.ts`):
+- `listPlugins()` - Get all installed plugins with status
+- `installPlugin(slug)` - Install from WordPress.org
+- `activatePlugin(slug)` / `deactivatePlugin(slug)`
+- `updatePlugin(slug)` / `deletePlugin(slug)`
+
+**Themes**:
+- `listThemes()` - Get all installed themes
+- `installTheme(slug)` / `activateTheme(slug)` / `deleteTheme(slug)`
+
+**Users**:
+- `listUsers()` - Get all WordPress users
+- `createUser(userData)` - Create new user with role
+- `resetUserPassword(userId, newPassword)`
+- `deleteUser(userId)`
+
+**Error Logs**:
+- `getErrorLog(logType, lines)` - Fetch PHP/Nginx/WordPress logs
+- `clearErrorLog(logType)` - Truncate log file
+
+#### Log File Locations (FluxCloud WordPress)
+
+```typescript
+export const LOG_PATHS = {
+  php: '/var/log/php-fpm-error.log',      // PHP-FPM errors
+  nginx: '/var/log/nginx/error.log',       // Nginx errors
+  wordpress: '/var/www/html/wp-content/debug.log', // WP debug (if enabled)
+};
+```
+
+#### WordPress Dashboard Components
+
+Located in `components/apps/wp-cli/`:
+- `index.tsx` - Main dashboard with node selector and tabs
+- `plugin-manager.tsx` - Plugin install/activate/update/delete UI
+- `theme-manager.tsx` - Theme management UI
+- `user-manager.tsx` - User creation and password reset
+- `error-logs.tsx` - Log viewer with search, download, clear
+- `wp-detection.ts` - WordPress app detection utility
+
 ### Project Structure
 
 This Capacitor project has Flux APIs in:
@@ -167,6 +280,7 @@ This Capacitor project has Flux APIs in:
 - `lib/api/flux-logs.ts` - Log fetching
 - `lib/api/flux-metrics.ts` - Performance metrics
 - `lib/api/flux-files.ts` - File operations (listFiles, downloadFile, saveFile)
+- `lib/api/flux-wp-cli.ts` - WP-CLI commands (plugins, themes, users, error logs)
 - `lib/api/apps.ts` - Registration APIs
 - `lib/api/client.ts` - Base axios client with auth
 
@@ -175,6 +289,7 @@ This Capacitor project has Flux APIs in:
 - `app/api/flux/files/route.ts` - Proxy for directory listing
 - `app/api/flux/files/download/route.ts` - Proxy for file download
 - `app/api/flux/files/upload/route.ts` - Proxy for file upload
+- `app/api/flux/exec-socket/route.ts` - Socket.io exec proxy (for WP-CLI commands)
 
 #### Components
 - `components/apps/app-card.tsx` - App summary card
@@ -182,6 +297,14 @@ This Capacitor project has Flux APIs in:
 - `components/apps/log-viewer.tsx` - Real-time log display
 - `components/apps/metrics-dashboard.tsx` - CPU/RAM/Network stats with node selector
 - `components/apps/file-browser.tsx` - File manager with view/edit capabilities
+- `components/apps/wp-cli/` - WordPress management dashboard
+  - `index.tsx` - Main dashboard with node selector and sub-tabs
+  - `plugin-manager.tsx` - Plugin management UI
+  - `theme-manager.tsx` - Theme management UI
+  - `user-manager.tsx` - User management UI
+  - `error-logs.tsx` - Error log viewer (PHP/Nginx/WP)
+  - `wp-detection.ts` - WordPress app detection
+  - `types.ts` - TypeScript interfaces
 
 ### Common Tasks
 
@@ -279,7 +402,10 @@ Key files for Flux integration:
 - [lib/api/flux-logs.ts](lib/api/flux-logs.ts)
 - [lib/api/flux-metrics.ts](lib/api/flux-metrics.ts)
 - [lib/api/flux-files.ts](lib/api/flux-files.ts)
+- [lib/api/flux-wp-cli.ts](lib/api/flux-wp-cli.ts) - WP-CLI API client
 - [lib/api/apps.ts](lib/api/apps.ts)
 - [lib/types/app-spec.ts](lib/types/app-spec.ts)
 - [app/api/flux/](app/api/flux/) - Next.js API proxies
+- [app/api/flux/exec-socket/route.ts](app/api/flux/exec-socket/route.ts) - Socket.io exec
 - [components/apps/](components/apps/) - UI components
+- [components/apps/wp-cli/](components/apps/wp-cli/) - WordPress management dashboard
