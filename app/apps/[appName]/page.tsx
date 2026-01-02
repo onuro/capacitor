@@ -114,7 +114,7 @@ export default function AppDetailPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <LifecycleControls appName={appName} />
+            <LifecycleControls appName={appName} locations={locations} />
             <Button variant="outline" size="sm" asChild>
               <a
                 href={`https://home.runonflux.io/apps/globalapps/${appName}`}
@@ -129,60 +129,38 @@ export default function AppDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
-        <Card className='p-1'>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              <Globe className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Instances</p>
-                <p className="text-xl font-bold">{app.instances}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className='p-1'>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              <Cpu className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">CPU</p>
-                <p className="text-xl font-bold">{totalCpu} cores</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className='p-1'>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              <MemoryStick className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">RAM</p>
-                <p className="text-xl font-bold">{totalRam} MB</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className='p-1'>
-          <CardContent>
-            <div className="flex items-center gap-3">
-              <HardDrive className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm text-muted-foreground">Storage</p>
-                <p className="text-xl font-bold">{totalHdd} GB</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
       <Tabs defaultValue="metrics" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="metrics">Metrics</TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
-          <TabsTrigger value="files">Files</TabsTrigger>
-          <TabsTrigger value="config">Configuration</TabsTrigger>
-        </TabsList>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <TabsList>
+            <TabsTrigger value="metrics">Metrics</TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
+            <TabsTrigger value="files">Files</TabsTrigger>
+            <TabsTrigger value="config">Configuration</TabsTrigger>
+          </TabsList>
+
+          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Globe className="h-4 w-4" />
+              <span className="font-medium text-foreground">{app.instances}</span>
+              <span>instances</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Cpu className="h-4 w-4" />
+              <span className="font-medium text-foreground">{totalCpu}</span>
+              <span>CPU</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <MemoryStick className="h-4 w-4" />
+              <span className="font-medium text-foreground">{totalRam}</span>
+              <span>MB</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <HardDrive className="h-4 w-4" />
+              <span className="font-medium text-foreground">{totalHdd}</span>
+              <span>GB</span>
+            </div>
+          </div>
+        </div>
 
         <TabsContent value="metrics">
           <MetricsDashboard appName={appName} />

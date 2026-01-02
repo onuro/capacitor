@@ -6,24 +6,43 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Play, Square, RotateCcw, Loader2 } from 'lucide-react';
-import { startApp, stopApp, restartApp } from '@/lib/api/flux-apps';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Play, Square, RotateCcw, Loader2, Globe, Server } from 'lucide-react';
+import {
+  startAppGlobally,
+  stopAppGlobally,
+  restartAppGlobally,
+  startAppOnNode,
+  stopAppOnNode,
+  restartAppOnNode,
+  type AppLocation,
+} from '@/lib/api/flux-apps';
+import { isZelidAuthValid } from '@/lib/api/auth';
 import { useAuthStore } from '@/stores/auth';
 import { toast } from 'sonner';
 
 interface LifecycleControlsProps {
   appName: string;
+  locations?: AppLocation[];
 }
 
 type Action = 'start' | 'stop' | 'restart';
+type ControlMode = 'global' | 'local';
 
-export function LifecycleControls({ appName }: LifecycleControlsProps) {
+export function LifecycleControls({ appName, locations = [] }: LifecycleControlsProps) {
   const [confirmAction, setConfirmAction] = useState<Action | null>(null);
+  const [controlMode, setControlMode] = useState<ControlMode>('global');
+  const [selectedInstance, setSelectedInstance] = useState<string>('');
   const { zelidauth } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -31,34 +50,86 @@ export function LifecycleControls({ appName }: LifecycleControlsProps) {
     start: {
       label: 'Start',
       icon: Play,
-      description: `This will start all instances of ${appName}.`,
       variant: 'default' as const,
-      fn: startApp,
     },
     stop: {
       label: 'Stop',
       icon: Square,
-      description: `This will stop all running instances of ${appName}. Users will not be able to access the app.`,
       variant: 'destructive' as const,
-      fn: stopApp,
     },
     restart: {
       label: 'Restart',
       icon: RotateCcw,
-      description: `This will restart all instances of ${appName}. There may be brief downtime.`,
       variant: 'outline' as const,
-      fn: restartApp,
     },
+  };
+
+  const getDescription = (action: Action): string => {
+    if (controlMode === 'global') {
+      const actionText = action === 'start' ? 'start' : action === 'stop' ? 'stop' : 'restart';
+      return `This will ${actionText} ALL instances of ${appName} across the network. This may take a while.`;
+    } else {
+      const instance = selectedInstance || 'the selected instance';
+      return `This will ${action} ${appName} on ${instance}.`;
+    }
   };
 
   const mutation = useMutation({
     mutationFn: async (action: Action) => {
       if (!zelidauth) throw new Error('Not authenticated');
-      return actionConfig[action].fn(zelidauth, appName);
+
+      // For global operations, check session validity
+      if (controlMode === 'global' && !isZelidAuthValid(zelidauth)) {
+        throw new Error('Session expired. Please log in again to perform global operations.');
+      }
+
+      let response;
+
+      if (controlMode === 'global') {
+        // Global operations
+        if (action === 'start') {
+          response = await startAppGlobally(zelidauth, appName);
+        } else if (action === 'stop') {
+          response = await stopAppGlobally(zelidauth, appName);
+        } else {
+          response = await restartAppGlobally(zelidauth, appName);
+        }
+      } else {
+        // Local operations - need selected instance
+        if (!selectedInstance) {
+          throw new Error('Please select an instance');
+        }
+
+        const [nodeIp, portStr] = selectedInstance.split(':');
+        const nodePort = parseInt(portStr, 10) || 16127;
+
+        if (action === 'start') {
+          response = await startAppOnNode(zelidauth, appName, nodeIp, nodePort);
+        } else if (action === 'stop') {
+          response = await stopAppOnNode(zelidauth, appName, nodeIp, nodePort);
+        } else {
+          response = await restartAppOnNode(zelidauth, appName, nodeIp, nodePort);
+        }
+      }
+
+      // Check API-level status
+      if (response.status === 'error') {
+        const data = response.data as unknown;
+        const errorMessage =
+          response.message ||
+          (typeof data === 'object' && data !== null && 'message' in data
+            ? (data as { message: string }).message
+            : null) ||
+          `Failed to ${action} app`;
+        throw new Error(errorMessage);
+      }
+
+      return response;
     },
     onSuccess: (_, action) => {
+      const scope = controlMode === 'global' ? 'globally' : `on ${selectedInstance}`;
       toast.success(`App ${action} initiated`, {
-        description: `${appName} is being ${action}ed. This may take a moment.`,
+        description: `${appName} is being ${action}ed ${scope}. This may take a moment.`,
       });
       queryClient.invalidateQueries({ queryKey: ['appLocations', appName] });
       queryClient.invalidateQueries({ queryKey: ['appStats', appName] });
@@ -75,11 +146,20 @@ export function LifecycleControls({ appName }: LifecycleControlsProps) {
     setConfirmAction(action);
   };
 
+  const handleDialogClose = () => {
+    setConfirmAction(null);
+    // Reset to defaults when closing
+    setControlMode('global');
+    setSelectedInstance('');
+  };
+
   const confirmAndExecute = () => {
     if (confirmAction) {
       mutation.mutate(confirmAction);
     }
   };
+
+  const canConfirm = controlMode === 'global' || (controlMode === 'local' && selectedInstance);
 
   return (
     <>
@@ -102,20 +182,70 @@ export function LifecycleControls({ appName }: LifecycleControlsProps) {
         })}
       </div>
 
-      <Dialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
-        <DialogContent>
+      <Dialog open={!!confirmAction} onOpenChange={handleDialogClose}>
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {confirmAction && `${actionConfig[confirmAction].label} ${appName}?`}
             </DialogTitle>
-            <DialogDescription>
-              {confirmAction && actionConfig[confirmAction].description}
-            </DialogDescription>
           </DialogHeader>
+
+          {/* Mode Toggle - Button Group */}
+          <div className="space-y-4">
+            <div className="flex gap-1 p-1 bg-muted rounded-lg">
+              <Button
+                variant={controlMode === 'global' ? 'default' : 'ghost'}
+                size="sm"
+                className="flex-1"
+                onClick={() => setControlMode('global')}
+              >
+                <Globe className="h-4 w-4 mr-2" />
+                Global
+              </Button>
+              <Button
+                variant={controlMode === 'local' ? 'default' : 'ghost'}
+                size="sm"
+                className="flex-1"
+                onClick={() => setControlMode('local')}
+                disabled={locations.length === 0}
+              >
+                <Server className="h-4 w-4 mr-2" />
+                Local
+              </Button>
+            </div>
+
+            {/* Instance Selector (only for local mode) */}
+            {controlMode === 'local' && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Select Instance</label>
+                <Select value={selectedInstance} onValueChange={setSelectedInstance}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose an instance..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((loc) => {
+                      const ipPort = loc.port ? `${loc.ip}:${loc.port}` : `${loc.ip}:16127`;
+                      return (
+                        <SelectItem key={ipPort} value={ipPort}>
+                          {ipPort}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Description */}
+            <p className="text-sm text-muted-foreground">
+              {confirmAction && getDescription(confirmAction)}
+            </p>
+          </div>
+
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setConfirmAction(null)}
+              onClick={handleDialogClose}
               disabled={mutation.isPending}
             >
               Cancel
@@ -123,7 +253,7 @@ export function LifecycleControls({ appName }: LifecycleControlsProps) {
             <Button
               variant={confirmAction ? actionConfig[confirmAction].variant : 'default'}
               onClick={confirmAndExecute}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || !canConfirm}
             >
               {mutation.isPending ? (
                 <>

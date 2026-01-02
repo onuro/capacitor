@@ -141,3 +141,43 @@ export function parseZelidAuth(zelidauth: string): {
     return null;
   }
 }
+
+/**
+ * Check if zelidauth session is still valid (not expired)
+ * LoginPhrase has a 1.5 hour TTL - the first 13 characters are a timestamp
+ * Global operations require a valid (non-expired) session
+ */
+export function isZelidAuthValid(zelidauth: string): boolean {
+  const parsed = parseZelidAuth(zelidauth);
+  if (!parsed) return false;
+
+  const { loginPhrase } = parsed;
+
+  // First 13 characters of loginPhrase are the timestamp
+  const timestamp = parseInt(loginPhrase.substring(0, 13), 10);
+  if (isNaN(timestamp) || timestamp <= 0) return false;
+
+  const maxAge = 1.5 * 60 * 60 * 1000; // 1.5 hours in milliseconds
+  const expiryTime = timestamp + maxAge;
+
+  return Date.now() < expiryTime;
+}
+
+/**
+ * Get time remaining until zelidauth expires (in milliseconds)
+ * Returns 0 if already expired or invalid
+ */
+export function getZelidAuthTimeRemaining(zelidauth: string): number {
+  const parsed = parseZelidAuth(zelidauth);
+  if (!parsed) return 0;
+
+  const { loginPhrase } = parsed;
+  const timestamp = parseInt(loginPhrase.substring(0, 13), 10);
+  if (isNaN(timestamp) || timestamp <= 0) return 0;
+
+  const maxAge = 1.5 * 60 * 60 * 1000;
+  const expiryTime = timestamp + maxAge;
+  const remaining = expiryTime - Date.now();
+
+  return Math.max(0, remaining);
+}

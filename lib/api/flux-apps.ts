@@ -1,4 +1,14 @@
 import apiClient from './client';
+import axios from 'axios';
+
+/**
+ * Build a node-specific API URL
+ * Transforms IP:port to Flux DNS format: https://185-209-30-228-16127.node.api.runonflux.io
+ */
+export function buildNodeApiUrl(ip: string, port: number = 16127): string {
+  const dashedIp = ip.replace(/\./g, '-');
+  return `https://${dashedIp}-${port}.node.api.runonflux.io`;
+}
 
 // Types for app management
 export interface FluxApp {
@@ -15,6 +25,7 @@ export interface FluxApp {
     ram: number;
     hdd: number;
     ports: number[];
+    domains?: string[];
   }[];
   instances: number;
   expire: number;
@@ -93,15 +104,81 @@ export async function getAppSpecification(
   return response.data;
 }
 
+// ============================================
+// GLOBAL App Lifecycle Operations
+// These affect ALL instances across the network
+// Endpoint format: /apps/appstart/{appName}/true
+// ============================================
+
 /**
- * Start an application (requires authentication)
+ * Start an application globally (all instances)
  */
-export async function startApp(
+export async function startAppGlobally(
   zelidauth: string,
   appName: string
 ): Promise<FluxApiResponse<string>> {
   const response = await apiClient.get<FluxApiResponse<string>>(
-    `/apps/appstart/${appName}`,
+    `/apps/appstart/${appName}/true`,
+    {
+      headers: { zelidauth },
+      timeout: 120000, // Global ops take longer
+    }
+  );
+  return response.data;
+}
+
+/**
+ * Stop an application globally (all instances)
+ */
+export async function stopAppGlobally(
+  zelidauth: string,
+  appName: string
+): Promise<FluxApiResponse<string>> {
+  const response = await apiClient.get<FluxApiResponse<string>>(
+    `/apps/appstop/${appName}/true`,
+    {
+      headers: { zelidauth },
+      timeout: 120000,
+    }
+  );
+  return response.data;
+}
+
+/**
+ * Restart an application globally (all instances)
+ */
+export async function restartAppGlobally(
+  zelidauth: string,
+  appName: string
+): Promise<FluxApiResponse<string>> {
+  const response = await apiClient.get<FluxApiResponse<string>>(
+    `/apps/apprestart/${appName}/true`,
+    {
+      headers: { zelidauth },
+      timeout: 120000,
+    }
+  );
+  return response.data;
+}
+
+// ============================================
+// LOCAL App Lifecycle Operations
+// These affect a SINGLE instance on a specific node
+// Requests go directly to the node's API endpoint
+// ============================================
+
+/**
+ * Start an application on a specific node
+ */
+export async function startAppOnNode(
+  zelidauth: string,
+  appName: string,
+  nodeIp: string,
+  nodePort: number = 16127
+): Promise<FluxApiResponse<string>> {
+  const nodeUrl = buildNodeApiUrl(nodeIp, nodePort);
+  const response = await axios.get<FluxApiResponse<string>>(
+    `${nodeUrl}/apps/appstart/${appName}`,
     {
       headers: { zelidauth },
       timeout: 60000,
@@ -111,14 +188,17 @@ export async function startApp(
 }
 
 /**
- * Stop an application (requires authentication)
+ * Stop an application on a specific node
  */
-export async function stopApp(
+export async function stopAppOnNode(
   zelidauth: string,
-  appName: string
+  appName: string,
+  nodeIp: string,
+  nodePort: number = 16127
 ): Promise<FluxApiResponse<string>> {
-  const response = await apiClient.get<FluxApiResponse<string>>(
-    `/apps/appstop/${appName}`,
+  const nodeUrl = buildNodeApiUrl(nodeIp, nodePort);
+  const response = await axios.get<FluxApiResponse<string>>(
+    `${nodeUrl}/apps/appstop/${appName}`,
     {
       headers: { zelidauth },
       timeout: 60000,
@@ -128,14 +208,17 @@ export async function stopApp(
 }
 
 /**
- * Restart an application (requires authentication)
+ * Restart an application on a specific node
  */
-export async function restartApp(
+export async function restartAppOnNode(
   zelidauth: string,
-  appName: string
+  appName: string,
+  nodeIp: string,
+  nodePort: number = 16127
 ): Promise<FluxApiResponse<string>> {
-  const response = await apiClient.get<FluxApiResponse<string>>(
-    `/apps/apprestart/${appName}`,
+  const nodeUrl = buildNodeApiUrl(nodeIp, nodePort);
+  const response = await axios.get<FluxApiResponse<string>>(
+    `${nodeUrl}/apps/apprestart/${appName}`,
     {
       headers: { zelidauth },
       timeout: 60000,
@@ -143,6 +226,11 @@ export async function restartApp(
   );
   return response.data;
 }
+
+// Legacy aliases (kept for backward compatibility, use global versions)
+export const startApp = startAppGlobally;
+export const stopApp = stopAppGlobally;
+export const restartApp = restartAppGlobally;
 
 /**
  * Get apps owned by a specific zelid

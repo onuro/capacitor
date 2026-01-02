@@ -1,33 +1,93 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Box, Cpu, HardDrive, MemoryStick, ExternalLink } from 'lucide-react';
+import { Box, Cpu, HardDrive, MemoryStick, ExternalLink, Globe } from 'lucide-react';
 import type { FluxApp } from '@/lib/api/flux-apps';
 
 interface AppCardProps {
   app: FluxApp;
 }
 
+// Get the first domain from any component, if available
+function getFirstDomain(app: FluxApp): string | null {
+  for (const component of app.compose) {
+    if (component.domains && component.domains.length > 0) {
+      return component.domains[0];
+    }
+  }
+  return null;
+}
+
+// Get favicon URL - try direct favicon first
+function getFaviconUrl(domain: string): string {
+  return `https://${domain}/favicon.ico`;
+}
+
+// Fallback favicon URL using DuckDuckGo's service (more reliable than Google for new sites)
+function getFallbackFaviconUrl(domain: string): string {
+  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
+}
+
 export function AppCard({ app }: AppCardProps) {
   const totalCpu = app.compose.reduce((sum, c) => sum + c.cpu, 0);
   const totalRam = app.compose.reduce((sum, c) => sum + c.ram, 0);
   const totalHdd = app.compose.reduce((sum, c) => sum + c.hdd, 0);
+  const domain = getFirstDomain(app);
+  // 0 = direct, 1 = fallback (DuckDuckGo), 2 = give up (show Box icon)
+  const [faviconStage, setFaviconStage] = useState(0);
+
+  const handleFaviconError = () => {
+    setFaviconStage((prev) => prev + 1);
+  };
+
+  const getFaviconSrc = () => {
+    if (!domain) return null;
+    if (faviconStage === 0) return getFaviconUrl(domain);
+    if (faviconStage === 1) return getFallbackFaviconUrl(domain);
+    return null;
+  };
+
+  const faviconSrc = getFaviconSrc();
 
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <Box className="h-5 w-5 text-primary" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 overflow-hidden">
+              {faviconSrc ? (
+                <img
+                  src={faviconSrc}
+                  alt={`${app.name} favicon`}
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 rounded"
+                  onError={handleFaviconError}
+                />
+              ) : (
+                <Box className="h-5 w-5 text-primary" />
+              )}
             </div>
             <div>
               <CardTitle className="text-lg">{app.name}</CardTitle>
               <CardDescription className="text-sm">
-                {app.compose.length} component{app.compose.length !== 1 ? 's' : ''}
+                {domain ? (
+                  <a
+                    href={`https://${domain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 hover:underline text-primary"
+                  >
+                    <Globe className="h-3 w-3" />
+                    {domain}
+                  </a>
+                ) : (
+                  `${app.compose.length} component${app.compose.length !== 1 ? 's' : ''}`
+                )}
               </CardDescription>
             </div>
           </div>
