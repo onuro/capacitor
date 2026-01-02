@@ -43,7 +43,7 @@ function LogMessage({ message }: { message: string }) {
     // Determine color based on status code range
     let colorClass = '';
     if (statusCode >= 200 && statusCode < 300) {
-      colorClass = 'text-green-500';
+      colorClass = 'text-green-600';
     } else if (statusCode >= 300 && statusCode < 400) {
       colorClass = 'text-blue-400';
     } else if (statusCode >= 400 && statusCode < 500) {
@@ -141,8 +141,8 @@ export function LogViewer({ appName }: LogViewerProps) {
   const logEntries = data?.data ? parseLogEntries(data.data) : [];
   const filteredLogs = filter
     ? logEntries.filter((log) =>
-        log.message.toLowerCase().includes(filter.toLowerCase())
-      )
+      log.message.toLowerCase().includes(filter.toLowerCase())
+    )
     : logEntries;
 
   useEffect(() => {

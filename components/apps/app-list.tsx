@@ -6,6 +6,7 @@ import { getOwnedApps, type FluxApp } from '@/lib/api/flux-apps';
 import { useAuthStore } from '@/stores/auth';
 import { Loader2, AlertCircle, Box } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ConnectButton } from '@/components/wallet/connect-button';
 import Link from 'next/link';
 
 export function AppList() {
@@ -30,9 +31,10 @@ export function AppList() {
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <Box className="h-12 w-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
-        <p className="text-muted-foreground max-w-md">
+        <p className="text-muted-foreground max-w-md mb-6">
           Connect your wallet to view and manage your deployed applications.
         </p>
+        <ConnectButton />
       </div>
     );
   }

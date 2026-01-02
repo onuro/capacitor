@@ -463,7 +463,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
 
   return (
     <>
-      <Card>
+      <Card className='gap-0'>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -481,6 +481,15 @@ export function FileBrowser({ appName }: FileBrowserProps) {
           </div>
           <div className='flex items-center justify-between'>
             <div className="flex items-center gap-1 text-sm mt-2">
+              {currentPath !== '/' && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={handleBack}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -553,18 +562,6 @@ export function FileBrowser({ appName }: FileBrowserProps) {
         </CardHeader>
 
         <CardContent>
-          {currentPath !== '/' && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleBack}
-              className="mb-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-          )}
-
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -586,8 +583,9 @@ export function FileBrowser({ appName }: FileBrowserProps) {
               This directory is empty.
             </div>
           ) : (
-            <ScrollArea className="h-[400px]">
-              <div className="space-y-1">
+            <ScrollArea className="h-[calc(100vh-32rem)] relative">
+              <div className="sticky top-0 h-8 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none -mb-8"></div>
+              <div className="space-y-1 pt-6">
                 {files
                   .sort((a, b) => {
                     if (a.isDirectory && !b.isDirectory) return -1;
@@ -597,7 +595,8 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   .map((file) => (
                     <div
                       key={file.name}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-muted group cursor-pointer"
+                      className={`flex items-center justify-between p-2 rounded-lg hover:bg-muted group select-none ${file.isDirectory ? 'cursor-pointer' : ''}`}
+                      onClick={() => handleNavigate(file)}
                       onDoubleClick={() => {
                         if (file.isDirectory) {
                           handleNavigate(file);
@@ -607,7 +606,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                       }}
                     >
                       <button
-                        className="flex items-center gap-3 flex-1 text-left"
+                        className={`flex items-center gap-3 flex-1 text-left ${file.isDirectory ? 'cursor-pointer' : 'cursor-auto'}`}
                         onClick={() => handleNavigate(file)}
                       >
                         {getFileIcon(file)}

@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
+import { toast } from 'sonner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.runonflux.io';
 
@@ -60,7 +61,20 @@ export function emitAuthInvalidated() {
 
 // Response interceptor for error handling
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Check for unauthorized indicator in response body (e.g., from Next.js API proxies)
+    const data = response.data;
+    if (data?.status === 'error' &&
+        typeof data?.message === 'string' &&
+        (data.message.toLowerCase().includes('unauthorized') ||
+         data.message.toLowerCase().includes('session expired'))) {
+      if (typeof window !== 'undefined') {
+        emitAuthInvalidated();
+        toast.error('Session expired. Please reconnect your wallet.');
+      }
+    }
+    return response;
+  },
   (error: AxiosError) => {
     // Handle specific error cases
     if (error.response?.status === 401) {
@@ -71,6 +85,7 @@ apiClient.interceptors.response.use(
         localStorage.removeItem('loginType');
         // Emit event for Zustand store to clear state
         emitAuthInvalidated();
+        toast.error('Session expired. Please reconnect your wallet.');
       }
     }
     return Promise.reject(error);

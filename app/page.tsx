@@ -14,7 +14,7 @@ import {
 
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-[calc(100vh-4rem)]">
+    <div className="flex flex-1 flex-col min-h-[calc(100vh-4rem)]">
       {/* Hero Section */}
       <section className="flex-1 flex items-center justify-center px-4 py-16 md:py-24">
         <div className="container max-w-5xl text-center">

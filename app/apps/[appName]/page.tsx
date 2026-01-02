@@ -12,7 +12,9 @@ import { LogViewer } from '@/components/apps/log-viewer';
 import { MetricsDashboard } from '@/components/apps/metrics-dashboard';
 import { FileBrowser } from '@/components/apps/file-browser';
 import { WPCliDashboard, isWordPressApp } from '@/components/apps/wp-cli';
+import { ConnectButton } from '@/components/wallet/connect-button';
 import { getAppSpecification, getAppLocations } from '@/lib/api/flux-apps';
+import { useAuthStore } from '@/stores/auth';
 import {
   ArrowLeft,
   Box,
@@ -31,6 +33,7 @@ interface PageProps {
 
 export default function AppDetailPage({ params }: PageProps) {
   const { appName } = use(params);
+  const { isAuthenticated } = useAuthStore();
 
   const {
     data: specData,
@@ -40,17 +43,35 @@ export default function AppDetailPage({ params }: PageProps) {
     queryKey: ['appSpec', appName],
     queryFn: () => getAppSpecification(appName),
     staleTime: 60000,
+    enabled: isAuthenticated,
   });
 
   const { data: locationsData } = useQuery({
     queryKey: ['appLocations', appName],
     queryFn: () => getAppLocations(appName),
     refetchInterval: 30000,
+    enabled: isAuthenticated,
   });
 
   const app = specData?.data;
   const locations = locationsData?.data || [];
   const isRunning = locations.length > 0;
+
+  // Not authenticated - show connect prompt
+  if (!isAuthenticated) {
+    return (
+      <main className="container py-8">
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Box className="h-12 w-12 text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
+          <p className="text-muted-foreground max-w-md mb-6">
+            Connect your wallet to view and manage your applications.
+          </p>
+          <ConnectButton />
+        </div>
+      </main>
+    );
+  }
 
   if (specLoading) {
     return (

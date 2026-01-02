@@ -2,8 +2,9 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { getLoginPhrase, verifyLogin, buildZelidAuth } from '@/lib/api/auth';
+import { getLoginPhrase, verifyLogin, buildZelidAuth, isZelidAuthValid } from '@/lib/api/auth';
 import { AUTH_INVALIDATED_EVENT } from '@/lib/api/client';
+import { toast } from 'sonner';
 
 export type LoginType = 'metamask' | 'walletconnect' | 'ssp' | 'zelcore' | null;
 
@@ -140,6 +141,18 @@ export const useAuthStore = create<AuthState>()(
         loginType: state.loginType,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        // Check if stored session is expired on app load
+        if (state?.zelidauth && state?.isAuthenticated) {
+          if (!isZelidAuthValid(state.zelidauth)) {
+            // Clear auth state on next tick (after hydration completes)
+            setTimeout(() => {
+              state.logout();
+              toast.error('Session expired. Please reconnect your wallet.');
+            }, 0);
+          }
+        }
+      },
     }
   )
 );

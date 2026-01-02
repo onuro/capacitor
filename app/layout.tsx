@@ -37,7 +37,7 @@ export default function RootLayout({
           <WalletProvider>
             <div className="relative flex min-h-screen flex-col">
               <Header />
-              <main className="flex-1 min-h-full bg-muted">{children}</main>
+              <main className="flex-1 flex flex-col min-h-full bg-muted">{children}</main>
               <Footer />
             </div>
             <Toaster />
