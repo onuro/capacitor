@@ -159,7 +159,7 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
+            <Users className="size-5" />
             Users ({users.length})
           </CardTitle>
           <div className="flex gap-2">
@@ -169,10 +169,10 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
             <Button size="sm" onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="size-4 mr-1" />
               Add User
             </Button>
           </div>
@@ -181,7 +181,7 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
+            <Loader2 className="size-6 animate-spin" />
           </div>
         ) : users.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No users found</p>
@@ -212,7 +212,7 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
                       disabled={isAnyMutating}
                       title="Reset Password"
                     >
-                      <KeyRound className="h-4 w-4" />
+                      <KeyRound className="size-4" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -223,7 +223,7 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
                       disabled={isAnyMutating}
                       title="Delete User"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="size-4 text-destructive" />
                     </Button>
                   </div>
                 </div>
@@ -316,7 +316,7 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
               }
             >
               {createMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               )}
               Create User
             </Button>
@@ -386,7 +386,7 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
               }
             >
               {resetPasswordMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               )}
               Reset Password
             </Button>
@@ -414,7 +414,7 @@ export function UserManager({ appName, nodeIp }: BaseWpCliProps) {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               )}
               Delete User
             </Button>

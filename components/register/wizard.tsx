@@ -130,7 +130,7 @@ export function RegistrationWizard() {
               <div className="flex flex-col items-center w-full">
                 <div
                   className={`
-                    flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors
+                    flex items-center justify-center size-10 rounded-full border-2 transition-colors
                     ${
                       currentStep > step.id
                         ? 'bg-primary border-primary text-primary-foreground'
@@ -141,7 +141,7 @@ export function RegistrationWizard() {
                   `}
                 >
                   {currentStep > step.id ? (
-                    <Check className="h-5 w-5" />
+                    <Check className="size-5" />
                   ) : (
                     <span className="text-sm font-medium">{step.id}</span>
                   )}

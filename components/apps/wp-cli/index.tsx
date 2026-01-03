@@ -1,7 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -11,10 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { getAppLocations, type AppLocation } from '@/lib/api/flux-apps';
+import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
-import { Loader2, Server, AlertCircle, Plug, Palette, Users, AlertTriangle, FileWarning } from 'lucide-react';
+import { useNodeSelection } from '@/hooks/use-node-selection';
+import { Loader2, Server, AlertCircle, Plug, Palette, Users, FileWarning } from 'lucide-react';
 import { PluginManager } from './plugin-manager';
 import { ThemeManager } from './theme-manager';
 import { UserManager } from './user-manager';
@@ -26,23 +24,15 @@ interface WPCliDashboardProps {
 
 export function WPCliDashboard({ appName }: WPCliDashboardProps) {
   const { zelidauth } = useAuthStore();
-  const [selectedNode, setSelectedNode] = useState<string>('');
 
-  // Fetch app locations
-  const { data: locationsData, isLoading: locationsLoading } = useQuery({
-    queryKey: ['appLocations', appName],
-    queryFn: () => getAppLocations(appName),
-    staleTime: 30000,
-  });
-
-  const locations: AppLocation[] = locationsData?.data || [];
-
-  // Auto-select first node when locations load
-  useEffect(() => {
-    if (locations.length > 0 && !selectedNode) {
-      setSelectedNode(locations[0].ip);
-    }
-  }, [locations, selectedNode]);
+  // Use unified node selection hook with 'wp' as preferred component for domain extraction
+  const {
+    selectedNode,
+    setSelectedNode,
+    sortedLocations,
+    isLoading: nodesLoading,
+    getNodeLabel,
+  } = useNodeSelection({ appName });
 
   // Not authenticated
   if (!zelidauth) {
@@ -50,7 +40,7 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
       <Card>
         <CardContent className="py-8">
           <div className="flex flex-col items-center text-center">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+            <AlertCircle className="size-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
               Please connect your wallet to manage WordPress.
             </p>
@@ -61,23 +51,23 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
   }
 
   // Loading
-  if (locationsLoading) {
+  if (nodesLoading) {
     return (
       <Card>
         <CardContent className="py-8 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin" />
+          <Loader2 className="size-6 animate-spin" />
         </CardContent>
       </Card>
     );
   }
 
   // No running instances
-  if (locations.length === 0) {
+  if (sortedLocations.length === 0) {
     return (
       <Card>
         <CardContent className="py-8">
           <div className="flex flex-col items-center text-center">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
+            <AlertCircle className="size-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
               No running instances found. Start the app to manage WordPress.
             </p>
@@ -99,15 +89,19 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
             </CardTitle>
             <Select value={selectedNode} onValueChange={setSelectedNode}>
               <SelectTrigger>
-                <Server className="h-4 w-4 mr-2" />
+                <Server className="size-4 mr-2" />
                 <SelectValue placeholder="Select node" />
               </SelectTrigger>
               <SelectContent>
-                {locations.map((loc, idx) => (
-                  <SelectItem key={loc.ip} value={loc.ip}>
-                    {loc.ip} {idx === 0 ? '(primary)' : ''}
-                  </SelectItem>
-                ))}
+                {sortedLocations.map((loc, idx) => {
+                  const ipPort = formatNodeAddress(loc);
+                  const label = getNodeLabel(loc, idx);
+                  return (
+                    <SelectItem key={ipPort} value={ipPort}>
+                      {ipPort} {label}
+                    </SelectItem>
+                  );
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -115,7 +109,7 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
         {/* {locations.length > 1 && (
           <CardContent className="pt-0">
             <Alert>
-              <AlertTriangle className="h-4 w-4" />
+              <AlertTriangle className="size-4" />
               <AlertDescription>
                 This app has {locations.length} instances. Changes made here only affect the
                 selected node and won&apos;t automatically sync to other instances.
@@ -130,19 +124,19 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
         <Tabs defaultValue="plugins" className="space-y-4">
           <TabsList>
             <TabsTrigger value="plugins" className="flex items-center gap-2">
-              <Plug className="h-4 w-4" />
+              <Plug className="size-4" />
               Plugins
             </TabsTrigger>
             <TabsTrigger value="themes" className="flex items-center gap-2">
-              <Palette className="h-4 w-4" />
+              <Palette className="size-4" />
               Themes
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
+              <Users className="size-4" />
               Users
             </TabsTrigger>
             <TabsTrigger value="logs" className="flex items-center gap-2">
-              <FileWarning className="h-4 w-4" />
+              <FileWarning className="size-4" />
               Error Logs
             </TabsTrigger>
           </TabsList>

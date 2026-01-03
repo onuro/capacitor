@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,8 +37,10 @@ import {
   isTextFile,
   type FileInfo,
 } from '@/lib/api/flux-files';
-import { getAppSpecification, getAppLocations } from '@/lib/api/flux-apps';
+import { getAppSpecification } from '@/lib/api/flux-apps';
+import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
+import { useNodeSelection } from '@/hooks/use-node-selection';
 import { toast } from 'sonner';
 import {
   Folder,
@@ -75,7 +77,7 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full bg-[#1e1e1e]">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <Loader2 className="size-8 animate-spin text-primary" />
     </div>
   ),
 });
@@ -233,20 +235,20 @@ interface FileBrowserProps {
 }
 
 function getFileIcon(file: FileInfo) {
-  if (file.isDirectory) return <Folder className="h-4 w-4 text-yellow-500" />;
+  if (file.isDirectory) return <Folder className="size-4 text-yellow-500" />;
 
   const ext = file.name.split('.').pop()?.toLowerCase() || '';
   const codeExts = ['js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'java', 'c', 'cpp'];
   const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
 
-  if (ext === 'conf') return <FileTerminal className="h-4 w-4 text-purple-800" />;
-  if (ext === 'php') return <FileCode2 className="h-4 w-4 text-purple-800" />;
-  if (codeExts.includes(ext)) return <FileCode className="h-4 w-4 text-blue-500" />;
-  if (imageExts.includes(ext)) return <Image className="h-4 w-4 text-green-500" />;
+  if (ext === 'conf') return <FileTerminal className="size-4 text-purple-800" />;
+  if (ext === 'php') return <FileCode2 className="size-4 text-purple-800" />;
+  if (codeExts.includes(ext)) return <FileCode className="size-4 text-blue-500" />;
+  if (imageExts.includes(ext)) return <Image className="size-4 text-green-500" />;
   if (['txt', 'md', 'json', 'yaml', 'yml', 'xml'].includes(ext))
-    return <FileText className="h-4 w-4 text-gray-500" />;
+    return <FileText className="size-4 text-gray-500" />;
 
-  return <File className="h-4 w-4 text-gray-400" />;
+  return <File className="size-4 text-gray-400" />;
 }
 
 export function FileBrowser({ appName }: FileBrowserProps) {
@@ -257,8 +259,25 @@ export function FileBrowser({ appName }: FileBrowserProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<string>('');
-  const [selectedNode, setSelectedNode] = useState<string>('');
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
+
+  // Use unified node selection hook
+  const {
+    selectedNode,
+    setSelectedNode,
+    sortedLocations,
+    isLoading: nodesLoading,
+    getNodeLabel,
+    masterNodeAddress,
+  } = useNodeSelection({ appName });
+
+  // Build fallback list: selected node first, then others
+  const allNodeIps = sortedLocations.map((l) => formatNodeAddress(l));
+  const nodeIpsForQuery = selectedNode
+    ? [selectedNode, ...allNodeIps.filter(ip => ip !== selectedNode)]
+    : masterNodeAddress
+      ? [masterNodeAddress, ...allNodeIps.filter(ip => ip !== masterNodeAddress)]
+      : allNodeIps;
   const [highlightedHtml, setHighlightedHtml] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -304,35 +323,17 @@ export function FileBrowser({ appName }: FileBrowserProps) {
     staleTime: 60000,
   });
 
-  // Fetch app locations to get node IPs
-  const { data: locationsData, isLoading: locationsLoading } = useQuery({
-    queryKey: ['appLocations', appName],
-    queryFn: () => getAppLocations(appName),
-    staleTime: 30000,
-  });
-
   // For compose apps (version > 3), get component names from compose array
   // For legacy apps (version <= 3), use the app name as the single component
   const composeComponents = specData?.data?.compose?.map((c) => c.name) || [];
   const components = composeComponents.length > 0 ? composeComponents : [appName];
-  const locations = locationsData?.data || [];
 
-  // Sort locations by broadcastedAt (primary first)
-  const sortedLocations = [...locations].sort((a, b) => {
-    const timeA = new Date(a.broadcastedAt).getTime();
-    const timeB = new Date(b.broadcastedAt).getTime();
-    const timeDiff = timeA - timeB;
-    if (Math.abs(timeDiff) <= 5000) {
-      return a.ip < b.ip ? -1 : a.ip > b.ip ? 1 : 0;
-    }
-    return timeDiff;
-  });
-
-  // Auto-select first component and primary node if not set
+  // Auto-select first component if not set
   const activeComponent = selectedComponent || components[0] || '';
-  const activeNode = selectedNode || sortedLocations[0]?.ip || '';
+  // For single-file operations (download/save/delete), use the selected node
+  const activeNode = selectedNode || nodeIpsForQuery[0] || '';
 
-  // Fetch files
+  // Fetch files - pass all node IPs for fallback
   const {
     data,
     isLoading,
@@ -341,9 +342,9 @@ export function FileBrowser({ appName }: FileBrowserProps) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['appFiles', appName, activeComponent, activeNode, currentPath],
-    queryFn: () => listFiles(zelidauth!, appName, activeComponent, activeNode, currentPath),
-    enabled: !!zelidauth && !!activeComponent && !!activeNode,
+    queryKey: ['appFiles', appName, activeComponent, selectedNode, currentPath],
+    queryFn: () => listFiles(zelidauth!, appName, activeComponent, nodeIpsForQuery, currentPath),
+    enabled: !!zelidauth && !!activeComponent && nodeIpsForQuery.length > 0,
     staleTime: 30000,
   });
 
@@ -525,7 +526,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
 
   const pathParts = currentPath.split('/').filter(Boolean);
   const files = data?.data?.files || [];
-  const isInitialLoading = specLoading || locationsLoading;
+  const isInitialLoading = specLoading || nodesLoading;
 
   if (!zelidauth) {
     return (
@@ -541,7 +542,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
     return (
       <Card>
         <CardContent className="py-8 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <Loader2 className="size-6 animate-spin text-primary" />
         </CardContent>
       </Card>
     );
@@ -573,7 +574,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
-              <Folder className="h-5 w-5" />
+              <Folder className="size-5" />
               File Browser
             </CardTitle>
             <Button
@@ -582,7 +583,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
           </div>
           <div className='flex items-center justify-between'>
@@ -593,7 +594,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   size="icon-sm"
                   onClick={handleBack}
                 >
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="size-4" />
                 </Button>
               )}
               <Button
@@ -604,11 +605,11 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   setSelectedItems(new Set());
                 }}
               >
-                <Home className="h-4 w-4" />
+                <Home className="size-4" />
               </Button>
               {pathParts.map((part, idx) => (
                 <div key={idx} className="flex items-center">
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  <ChevronRight className="size-4 text-muted-foreground" />
                   <Button
                     variant="ghost"
                     size="sm"
@@ -656,15 +657,19 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                 }}
               >
                 <SelectTrigger className="w-[200px] h-9 text-xs">
-                  <Server className="h-3 w-3 mr-1" />
+                  <Server className="size-3 mr-1" />
                   <SelectValue placeholder="Select node" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sortedLocations.map((loc, idx) => (
-                    <SelectItem key={loc.ip} value={loc.ip}>
-                      {loc.ip} {idx === 0 ? '(primary)' : ''}
-                    </SelectItem>
-                  ))}
+                  {sortedLocations.map((loc, idx) => {
+                    const ipPort = formatNodeAddress(loc);
+                    const label = getNodeLabel(loc, idx);
+                    return (
+                      <SelectItem key={ipPort} value={ipPort}>
+                        {ipPort} {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -676,7 +681,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
         <CardContent>
           {/* Bulk Action Bar */}
           {files.length > 0 && (
-            <div className="flex items-center justify-between h-20 border-b">
+            <div className="flex items-center justify-between h-16 border-b">
               <div className="flex items-center gap-2 pl-2">
                 <button
                   onClick={toggleSelectAll}
@@ -684,11 +689,11 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   disabled={isDeleting}
                 >
                   {selectedItems.size === 0 ? (
-                    <Square className="h-4 w-4 text-muted-foreground" />
+                    <Square className="size-4 text-muted-foreground" />
                   ) : selectedItems.size === files.length ? (
-                    <CheckSquare className="h-4 w-4 text-primary" />
+                    <CheckSquare className="size-4 text-primary" />
                   ) : (
-                    <MinusSquare className="h-4 w-4 text-primary" />
+                    <MinusSquare className="size-4 text-primary" />
                   )}
                   <span className="text-sm text-muted-foreground">
                     {selectedItems.size > 0 ? `${selectedItems.size} selected` : 'Select all'}
@@ -713,12 +718,12 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   >
                     {isDeleting && deleteProgress ? (
                       <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="size-4 mr-2 animate-spin" />
                         {deleteProgress.done}/{deleteProgress.total}
                       </>
                     ) : (
                       <>
-                        <Trash2 className="h-4 w-4 mr-2" />
+                        <Trash2 className="size-4 mr-2" />
                         Delete
                       </>
                     )}
@@ -730,7 +735,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
 
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <Loader2 className="size-6 animate-spin text-primary" />
             </div>
           ) : isError || data?.status === 'error' ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -751,7 +756,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
           ) : (
             <ScrollArea className="min-h-[440px] h-[calc(100vh-32rem)] relative">
               <div className="sticky top-0 h-8 bg-gradient-to-b from-card to-transparent z-10 pointer-events-none -mb-8"></div>
-              <div className="space-y-1 pt-6">
+              <div className="space-y-1 pt-4">
                 {files
                   .sort((a, b) => {
                     if (a.isDirectory && !b.isDirectory) return -1;
@@ -781,9 +786,9 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                           disabled={isDeleting}
                         >
                           {selectedItems.has(file.name) ? (
-                            <CheckSquare className="h-4 w-4 text-primary" />
+                            <CheckSquare className="size-4 text-primary" />
                           ) : (
-                            <Square className="h-4 w-4 text-muted-foreground" />
+                            <Square className="size-4 text-muted-foreground" />
                           )}
                         </button>
                         <button
@@ -812,7 +817,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                             onClick={() => handleOpenFile(file, true)}
                             title="View file"
                           >
-                            <Eye className="h-4 w-4" />
+                            <Eye className="size-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -820,7 +825,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                             onClick={() => handleOpenFile(file, false)}
                             title="Edit file"
                           >
-                            <Edit3 className="h-4 w-4" />
+                            <Edit3 className="size-4" />
                           </Button>
                         </div>
                       )}
@@ -836,7 +841,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
         <SheetContent side="left" className="w-full !max-w-[1200px] flex flex-col">
           <SheetHeader className='pb-0'>
             <SheetTitle className="flex items-center gap-2">
-              {isViewOnly ? <Eye className="h-4 w-4" /> : <Edit3 className="h-4 w-4" />}
+              {isViewOnly ? <Eye className="size-4" /> : <Edit3 className="size-4" />}
               {editingFile?.name}
               {!isViewOnly && <span className="text-xs text-muted-foreground">(editing)</span>}
             </SheetTitle>
@@ -847,7 +852,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
 
           {isLoadingFile || !highlighter ? (
             <div className="flex items-center justify-center flex-1">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <Loader2 className="size-8 animate-spin text-primary" />
             </div>
           ) : isViewOnly ? (
             <ScrollArea className="flex-1 border">
@@ -908,15 +913,15 @@ export function FileBrowser({ appName }: FileBrowserProps) {
 
           <SheetFooter className="mt-auto pt-0 flex-row gap-2">
             <Button variant="outline" onClick={handleCloseEditor}>
-              <X className="h-4 w-4 mr-2" />
+              <X className="size-4 mr-2" />
               {isViewOnly ? 'Close' : 'Cancel'}
             </Button>
             {!isViewOnly && (
               <Button onClick={handleSaveFile} disabled={isSaving} className='flex-1'>
                 {isSaving ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="size-4 mr-2 animate-spin" />
                 ) : (
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="size-4 mr-2" />
                 )}
                 Save
               </Button>
@@ -947,7 +952,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleBulkDelete}>
-              <Trash2 className="h-4 w-4 mr-2" />
+              <Trash2 className="size-4 mr-2" />
               Delete
             </Button>
           </DialogFooter>

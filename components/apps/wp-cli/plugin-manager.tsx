@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,6 @@ import type { BaseWpCliProps } from './types';
 
 export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
   const { zelidauth } = useAuthStore();
-  const queryClient = useQueryClient();
   const [installSlug, setInstallSlug] = useState('');
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<{
@@ -73,7 +72,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
     },
     onSuccess: () => {
       toast.success('Plugin activated');
-      queryClient.invalidateQueries({ queryKey: ['wp-plugins', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to activate: ${error.message}`),
   });
@@ -88,7 +87,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
     onSuccess: () => {
       toast.success('Plugin deactivated');
       setConfirmAction(null);
-      queryClient.invalidateQueries({ queryKey: ['wp-plugins', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to deactivate: ${error.message}`),
   });
@@ -102,7 +101,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
     },
     onSuccess: () => {
       toast.success('Plugin updated');
-      queryClient.invalidateQueries({ queryKey: ['wp-plugins', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to update: ${error.message}`),
   });
@@ -117,7 +116,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
     onSuccess: () => {
       toast.success('Plugin deleted');
       setConfirmAction(null);
-      queryClient.invalidateQueries({ queryKey: ['wp-plugins', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to delete: ${error.message}`),
   });
@@ -133,12 +132,12 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
       toast.success('Plugin installed');
       setInstallDialogOpen(false);
       setInstallSlug('');
-      queryClient.invalidateQueries({ queryKey: ['wp-plugins', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to install: ${error.message}`),
   });
 
-  const plugins = (data as WPPlugin[]) || [];
+  const plugins = Array.isArray(data) ? data : [];
   const isAnyMutating =
     activateMutation.isPending ||
     deactivateMutation.isPending ||
@@ -151,7 +150,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Plug className="h-5 w-5" />
+            <Plug className="size-5" />
             Plugins ({plugins.length})
           </CardTitle>
           <div className="flex gap-2">
@@ -161,10 +160,10 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
             <Button size="sm" onClick={() => setInstallDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="size-4 mr-1" />
               Install
             </Button>
           </div>
@@ -173,7 +172,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
+            <Loader2 className="size-6 animate-spin" />
           </div>
         ) : plugins.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No plugins found</p>
@@ -211,7 +210,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
                         disabled={isAnyMutating}
                         title="Activate"
                       >
-                        <Play className="h-4 w-4" />
+                        <Play className="size-4" />
                       </Button>
                     ) : (
                       <Button
@@ -223,7 +222,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
                         disabled={isAnyMutating}
                         title="Deactivate"
                       >
-                        <Pause className="h-4 w-4" />
+                        <Pause className="size-4" />
                       </Button>
                     )}
                     {plugin.update === 'available' && (
@@ -234,7 +233,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
                         disabled={isAnyMutating}
                         title="Update"
                       >
-                        <ArrowUp className="h-4 w-4" />
+                        <ArrowUp className="size-4" />
                       </Button>
                     )}
                     <Button
@@ -246,7 +245,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
                       disabled={isAnyMutating}
                       title="Delete"
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                      <Trash2 className="size-4 text-destructive" />
                     </Button>
                   </div>
                 </div>
@@ -285,7 +284,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
               disabled={!installSlug.trim() || installMutation.isPending}
             >
               {installMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               )}
               Install
             </Button>
@@ -323,7 +322,7 @@ export function PluginManager({ appName, nodeIp }: BaseWpCliProps) {
               disabled={deleteMutation.isPending || deactivateMutation.isPending}
             >
               {(deleteMutation.isPending || deactivateMutation.isPending) && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               )}
               {confirmAction?.type === 'delete' ? 'Delete' : 'Deactivate'}
             </Button>

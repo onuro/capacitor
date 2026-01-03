@@ -147,8 +147,8 @@ export function StepDeploy({
     return (
       <div className="space-y-6">
         <div className="text-center py-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full mb-4">
-            <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+          <div className="inline-flex items-center justify-center size-16 bg-green-100 dark:bg-green-900/30 rounded-full mb-4">
+            <CheckCircle className="size-8 text-green-600 dark:text-green-400" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Registration Successful!</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
@@ -161,7 +161,7 @@ export function StepDeploy({
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center gap-2">
-                <Wallet className="h-5 w-5" />
+                <Wallet className="size-5" />
                 Payment Required
               </CardTitle>
             </CardHeader>
@@ -177,14 +177,14 @@ export function StepDeploy({
                   onClick={() => copyToClipboard(paymentAddress)}
                 >
                   {copied ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <CheckCircle className="size-4 text-green-500" />
                   ) : (
-                    <Copy className="h-4 w-4" />
+                    <Copy className="size-4" />
                   )}
                 </Button>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="h-4 w-4" />
+                <Clock className="size-4" />
                 <span>Payment window: 30 minutes</span>
               </div>
             </CardContent>
@@ -209,7 +209,7 @@ export function StepDeploy({
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Rocket className="h-5 w-5" />
+              <Rocket className="size-5" />
               What&apos;s Next?
             </CardTitle>
           </CardHeader>
@@ -219,11 +219,11 @@ export function StepDeploy({
             </p>
             <ul className="text-sm space-y-2">
               <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CheckCircle className="size-4 text-green-500" />
                 Your app will be available at: <code className="text-xs bg-muted px-2 py-0.5 rounded">{formData.general.name}.app.runonflux.io</code>
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CheckCircle className="size-4 text-green-500" />
                 Deployment typically takes 5-10 minutes
               </li>
             </ul>
@@ -241,7 +241,7 @@ export function StepDeploy({
           >
             <Button className="gap-2">
               View on FluxCloud
-              <ExternalLink className="h-4 w-4" />
+              <ExternalLink className="size-4" />
             </Button>
           </a>
         </div>
@@ -254,8 +254,8 @@ export function StepDeploy({
     return (
       <div className="space-y-6">
         <div className="text-center py-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
-            <XCircle className="h-8 w-8 text-red-600 dark:text-red-400" />
+          <div className="inline-flex items-center justify-center size-16 bg-red-100 dark:bg-red-900/30 rounded-full mb-4">
+            <XCircle className="size-8 text-red-600 dark:text-red-400" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Registration Failed</h2>
           <p className="text-muted-foreground max-w-md mx-auto">
@@ -273,7 +273,7 @@ export function StepDeploy({
 
         <div className="flex justify-center gap-4 pt-4">
           <Button variant="outline" onClick={onBack} className="gap-2">
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="size-4" />
             Go Back
           </Button>
         </div>
@@ -285,7 +285,7 @@ export function StepDeploy({
   return (
     <div className="space-y-6">
       <div className="text-center py-12">
-        <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
+        <Loader2 className="size-12 animate-spin mx-auto mb-4 text-primary" />
         <h2 className="text-2xl font-bold mb-2">Registering Your App</h2>
         <p className="text-muted-foreground">
           Please wait while we register your application on FluxCloud...
@@ -296,19 +296,19 @@ export function StepDeploy({
         <CardContent className="pt-6">
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                <CheckCircle className="h-4 w-4 text-primary-foreground" />
+              <div className="size-6 rounded-full bg-primary flex items-center justify-center">
+                <CheckCircle className="size-4 text-primary-foreground" />
               </div>
               <span>Specifications validated</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                <CheckCircle className="h-4 w-4 text-primary-foreground" />
+              <div className="size-6 rounded-full bg-primary flex items-center justify-center">
+                <CheckCircle className="size-4 text-primary-foreground" />
               </div>
               <span>Transaction signed</span>
             </div>
             <div className="flex items-center gap-3">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <Loader2 className="size-6 animate-spin text-primary" />
               <span>Submitting to FluxCloud...</span>
             </div>
           </div>

@@ -11,7 +11,7 @@ export default function AppsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Box className="h-8 w-8" />
+            <Box className="size-8" />
             My Apps
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -20,7 +20,7 @@ export default function AppsPage() {
         </div>
         <Button asChild>
           <Link href="/register">
-            <Plus className="h-4 w-4" />
+            <Plus className="size-4" />
             Deploy New App
           </Link>
         </Button>

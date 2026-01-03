@@ -14,12 +14,37 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getAppLogs, parseLogEntries } from '@/lib/api/flux-logs';
-import { getAppLocations, getAppSpecification } from '@/lib/api/flux-apps';
+import { getAppSpecification } from '@/lib/api/flux-apps';
+import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
+import { useNodeSelection } from '@/hooks/use-node-selection';
 import { Loader2, Search, Download, RefreshCw, Terminal, Server, Box } from 'lucide-react';
 
 interface LogViewerProps {
   appName: string;
+}
+
+// Format timestamp with relative date (Today, Yesterday, X days ago) + time
+function formatLogTimestamp(timestamp: string): string {
+  const date = new Date(timestamp);
+  const now = new Date();
+
+  // Reset time to midnight for date comparison
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const diffTime = todayOnly.getTime() - dateOnly.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  const timeStr = date.toLocaleTimeString();
+
+  if (diffDays === 0) {
+    return `Today ${timeStr}`;
+  } else if (diffDays === 1) {
+    return `Yesterday ${timeStr}`;
+  } else {
+    return `${diffDays}d ago ${timeStr}`;
+  }
 }
 
 // Helper component to colorize HTTP status codes in log messages
@@ -79,10 +104,27 @@ export function LogViewer({ appName }: LogViewerProps) {
   const [lines, setLines] = useState('100');
   const [filter, setFilter] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
-  const [selectedNode, setSelectedNode] = useState<string>('');
   const [selectedComponent, setSelectedComponent] = useState<string>('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const zelidauth = useAuthStore((state) => state.zelidauth);
+
+  // Use unified node selection hook
+  const {
+    selectedNode,
+    setSelectedNode,
+    sortedLocations,
+    isLoading: nodesLoading,
+    getNodeLabel,
+    masterNodeAddress,
+  } = useNodeSelection({ appName });
+
+  // Build fallback list: selected node first, then others
+  const allNodeIps = sortedLocations.map((l) => formatNodeAddress(l));
+  const nodeIpsForQuery = selectedNode
+    ? [selectedNode, ...allNodeIps.filter(ip => ip !== selectedNode)]
+    : masterNodeAddress
+      ? [masterNodeAddress, ...allNodeIps.filter(ip => ip !== masterNodeAddress)]
+      : allNodeIps;
 
   // Fetch app specification to get compose info
   const { data: appSpecData } = useQuery({
@@ -94,23 +136,6 @@ export function LogViewer({ appName }: LogViewerProps) {
   const appSpec = appSpecData?.data;
   const isComposeApp = appSpec && appSpec.version >= 4 && appSpec.compose?.length > 0;
   const components = appSpec?.compose?.map((c) => c.name) || [];
-
-  // Fetch app locations (instances)
-  const { data: locationsData } = useQuery({
-    queryKey: ['appLocations', appName],
-    queryFn: () => getAppLocations(appName),
-    staleTime: 30000,
-  });
-
-  const locations = locationsData?.data || [];
-  const nodeIp = selectedNode || locations[0]?.ip;
-
-  // Auto-select first node when locations load
-  useEffect(() => {
-    if (locations.length > 0 && !selectedNode) {
-      setSelectedNode(locations[0].ip);
-    }
-  }, [locations, selectedNode]);
 
   // Auto-select first component for compose apps
   useEffect(() => {
@@ -131,11 +156,11 @@ export function LogViewer({ appName }: LogViewerProps) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['appLogs', containerName, nodeIp, lines],
-    queryFn: () => getAppLogs(nodeIp!, containerName, parseInt(lines), zelidauth || undefined),
+    queryKey: ['appLogs', containerName, selectedNode, lines],
+    queryFn: () => getAppLogs(nodeIpsForQuery, containerName, parseInt(lines), zelidauth || undefined),
     refetchInterval: 10000,
     staleTime: 5000,
-    enabled: !!zelidauth && !!nodeIp && (!isComposeApp || !!selectedComponent),
+    enabled: !!zelidauth && nodeIpsForQuery.length > 0 && (!isComposeApp || !!selectedComponent),
   });
 
   const logEntries = data?.data ? parseLogEntries(data.data) : [];
@@ -167,14 +192,14 @@ export function LogViewer({ appName }: LogViewerProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Terminal className="h-5 w-5" />
+            <Terminal className="size-5" />
             Application Logs
           </CardTitle>
           <div className="flex items-center gap-2">
             {isComposeApp && components.length > 1 && (
               <Select value={selectedComponent} onValueChange={setSelectedComponent}>
-                <SelectTrigger className="w-40">
-                  <Box className="h-4 w-4 mr-2" />
+                <SelectTrigger>
+                  <Box className="size-4 mr-2" />
                   <SelectValue placeholder="Component" />
                 </SelectTrigger>
                 <SelectContent>
@@ -186,23 +211,27 @@ export function LogViewer({ appName }: LogViewerProps) {
                 </SelectContent>
               </Select>
             )}
-            {locations.length > 1 && (
+            {sortedLocations.length > 1 && (
               <Select value={selectedNode} onValueChange={setSelectedNode}>
                 <SelectTrigger className="w-48">
-                  <Server className="h-4 w-4 mr-2" />
+                  <Server className="size-4 mr-2" />
                   <SelectValue placeholder="Select node" />
                 </SelectTrigger>
                 <SelectContent>
-                  {locations.map((loc, idx) => (
-                    <SelectItem key={loc.ip} value={loc.ip}>
-                      {loc.ip} {idx === 0 ? '(primary)' : ''}
-                    </SelectItem>
-                  ))}
+                  {sortedLocations.map((loc, idx) => {
+                    const ipPort = formatNodeAddress(loc);
+                    const label = getNodeLabel(loc, idx);
+                    return (
+                      <SelectItem key={ipPort} value={ipPort}>
+                        {ipPort} {label}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             )}
             <Select value={lines} onValueChange={setLines}>
-              <SelectTrigger className="w-24">
+              <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -218,15 +247,15 @@ export function LogViewer({ appName }: LogViewerProps) {
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
             <Button variant="outline" size="icon" onClick={handleDownload}>
-              <Download className="h-4 w-4" />
+              <Download className="size-4" />
             </Button>
           </div>
         </div>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Filter logs..."
             value={filter}
@@ -240,13 +269,13 @@ export function LogViewer({ appName }: LogViewerProps) {
           <div className="text-center py-8 text-muted-foreground">
             Please log in to view application logs.
           </div>
-        ) : !nodeIp ? (
+        ) : nodeIpsForQuery.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             No running instances found. Start the app to view logs.
           </div>
         ) : isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <Loader2 className="size-6 animate-spin text-primary" />
           </div>
         ) : isError ? (
           <div className="text-center py-8 text-muted-foreground">
@@ -254,7 +283,7 @@ export function LogViewer({ appName }: LogViewerProps) {
           </div>
         ) : (
           <ScrollArea className="h-[400px] rounded-md border bg-muted/50" ref={scrollRef}>
-            <div className="p-4 font-mono text-xs space-y-1">
+            <div className="p-4 font-mono text-sm space-y-1">
               {filteredLogs.length === 0 ? (
                 <p className="text-muted-foreground">No logs available</p>
               ) : (
@@ -263,8 +292,8 @@ export function LogViewer({ appName }: LogViewerProps) {
                     key={idx}
                     className="flex gap-2 hover:bg-muted rounded px-1"
                   >
-                    <span className="text-muted-foreground shrink-0 w-[180px]">
-                      {new Date(log.timestamp).toLocaleString()}
+                    <span className="text-muted-foreground shrink-0 min-w-[150px]">
+                      {formatLogTimestamp(log.timestamp)}
                     </span>
                     <LogMessage message={log.message} />
                   </div>

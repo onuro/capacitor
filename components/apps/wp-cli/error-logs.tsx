@@ -44,9 +44,9 @@ import {
 import type { BaseWpCliProps } from './types';
 
 const LOG_TABS: { id: LogType; label: string; icon: React.ReactNode; description: string }[] = [
-  { id: 'php', label: 'PHP Errors', icon: <FileCode className="h-4 w-4" />, description: 'PHP-FPM error log' },
-  { id: 'nginx', label: 'Nginx', icon: <Server className="h-4 w-4" />, description: 'Nginx error log' },
-  { id: 'wordpress', label: 'WP Debug', icon: <Bug className="h-4 w-4" />, description: 'WordPress debug.log' },
+  { id: 'php', label: 'PHP Errors', icon: <FileCode className="size-4" />, description: 'PHP-FPM error log' },
+  { id: 'nginx', label: 'Nginx', icon: <Server className="size-4" />, description: 'Nginx error log' },
+  { id: 'wordpress', label: 'WP Debug', icon: <Bug className="size-4" />, description: 'WordPress debug.log' },
 ];
 
 const LINE_OPTIONS = [50, 100, 200, 500];
@@ -137,7 +137,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <CardTitle className="flex items-center gap-2">
-            <FileWarning className="h-5 w-5 text-orange-500" />
+            <FileWarning className="size-5 text-orange-500" />
             Error Logs
           </CardTitle>
           <div className="flex items-center gap-2">
@@ -162,7 +162,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </div>
@@ -183,7 +183,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
         {/* Search and Actions */}
         <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Search logs..."
               value={searchTerm}
@@ -198,7 +198,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
               onClick={handleDownload}
               disabled={!logContent}
             >
-              <Download className="h-4 w-4 mr-1" />
+              <Download className="size-4 mr-1" />
               Download
             </Button>
             <Button
@@ -207,7 +207,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
               onClick={() => setClearDialogOpen(true)}
               className="text-destructive hover:text-destructive"
             >
-              <Trash2 className="h-4 w-4 mr-1" />
+              <Trash2 className="size-4 mr-1" />
               Clear
             </Button>
           </div>
@@ -226,11 +226,11 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
         {/* Log Content */}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
+            <Loader2 className="size-6 animate-spin" />
           </div>
         ) : !logContent || logContent.trim() === '' ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <FileWarning className="h-12 w-12 text-muted-foreground mb-4" />
+            <FileWarning className="size-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
               No {activeTabInfo?.label.toLowerCase() || 'error'} logs found
             </p>
@@ -240,7 +240,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
           </div>
         ) : filteredLines.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Search className="h-12 w-12 text-muted-foreground mb-4" />
+            <Search className="size-12 text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No matching log entries</p>
             <p className="text-xs text-muted-foreground mt-1">
               Try a different search term
@@ -278,7 +278,7 @@ export function ErrorLogsViewer({ appName, nodeIp }: BaseWpCliProps) {
                 disabled={clearMutation.isPending}
               >
                 {clearMutation.isPending && (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <Loader2 className="size-4 mr-2 animate-spin" />
                 )}
                 Clear Log
               </Button>

@@ -1,17 +1,25 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   getAppStatsFromNodes,
   formatBytes,
   formatCpu,
-  AppStats,
 } from '@/lib/api/flux-metrics';
-import { getAppLocations } from '@/lib/api/flux-apps';
+import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
+import { useNodeSelection } from '@/hooks/use-node-selection';
 import {
   Cpu,
   MemoryStick,
@@ -23,14 +31,6 @@ import {
   Activity,
   Globe,
 } from 'lucide-react';
-import { useState } from 'react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface MetricsDashboardProps {
   appName: string;
@@ -56,7 +56,7 @@ function MetricCard({ title, value, subtitle, icon }: MetricCardProps) {
               <p className="text-xs text-muted-foreground">{subtitle}</p>
             )}
           </div>
-          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <div className="size-10 rounded-full bg-primary/10 flex items-center justify-center">
             {icon}
           </div>
         </div>
@@ -69,34 +69,22 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
   const { zelidauth } = useAuthStore();
   const [selectedNode, setSelectedNode] = useState<string>('auto');
 
-  const { data: locationsData, isLoading: locationsLoading } = useQuery({
-    queryKey: ['appLocations', appName],
-    queryFn: () => getAppLocations(appName),
-    refetchInterval: 30000,
-    staleTime: 20000,
-  });
+  // Use unified node selection hook (but we manage selectedNode separately for "auto" mode)
+  const {
+    sortedLocations,
+    masterNodeAddress,
+    isLoading: nodesLoading,
+    getNodeLabel,
+  } = useNodeSelection({ appName, autoSelectMaster: false });
 
-  const locations = locationsData?.data || [];
-
-  // Sort locations by broadcastedAt (earliest first) to get deterministic "primary" node
-  // This matches Flux's leader election algorithm for Syncthing
-  const sortedLocations = [...locations].sort((a, b) => {
-    const timeA = new Date(a.broadcastedAt).getTime();
-    const timeB = new Date(b.broadcastedAt).getTime();
-    const timeDiff = timeA - timeB;
-    // Use IP as tie-breaker if timestamps are within 5 seconds (clock skew tolerance)
-    if (Math.abs(timeDiff) <= 5000) {
-      return a.ip < b.ip ? -1 : a.ip > b.ip ? 1 : 0;
-    }
-    return timeDiff;
-  });
-
-  const nodeIps = sortedLocations.map((l) => l.ip);
-  const primaryNodeIp = nodeIps[0]; // First node after sorting is the "primary"
+  const nodeIps = sortedLocations.map((l) => formatNodeAddress(l));
 
   // Determine which nodes to query based on selection
+  // In "auto" mode, prioritize master node first, then fall back to others
   const nodesToQuery = selectedNode === 'auto'
-    ? nodeIps // Will try in order, primary first
+    ? masterNodeAddress
+      ? [masterNodeAddress, ...nodeIps.filter(ip => ip !== masterNodeAddress)]
+      : nodeIps
     : [selectedNode];
 
   // Fetch stats from nodes - tries each until one returns valid data
@@ -122,10 +110,10 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
   const statsData = statsResponse?.data || null;
   const statsNodeIp = statsResponse?.nodeIp;
 
-  const isLoading = locationsLoading;
+  const isLoading = nodesLoading;
   const stats = statsData;
   const hasStats = stats?.containers && stats.containers.length > 0;
-  const isStatsLoading = (statsLoading && !statsData) || (nodeIps.length === 0 && locations.length > 0);
+  const isStatsLoading = (statsLoading && !statsData) || (nodeIps.length === 0 && sortedLocations.length > 0);
 
   const totalCpu = stats?.containers?.reduce((sum, c) => sum + c.cpu, 0) || 0;
   const totalMemoryUsage =
@@ -140,7 +128,7 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <Loader2 className="size-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -150,7 +138,7 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Activity className="h-5 w-5" />
+            <Activity className="size-5" />
             Resource Metrics
           </h3>
           {statsNodeIp && hasStats && (
@@ -165,12 +153,16 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
               <SelectValue placeholder="Select node" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="auto">Auto (primary node)</SelectItem>
-              {sortedLocations.map((loc, idx) => (
-                <SelectItem key={loc.ip} value={loc.ip}>
-                  {loc.ip} {idx === 0 ? '(primary)' : ''}
-                </SelectItem>
-              ))}
+              <SelectItem value="auto">Auto (detected node)</SelectItem>
+              {sortedLocations.map((loc, idx) => {
+                const ipPort = formatNodeAddress(loc);
+                const label = getNodeLabel(loc, idx);
+                return (
+                  <SelectItem key={ipPort} value={ipPort}>
+                    {ipPort} {label}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
           <Button
@@ -179,7 +171,7 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
             onClick={() => refetchStats()}
             disabled={statsFetching}
           >
-            <RefreshCw className={`h-4 w-4 ${statsFetching ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`size-4 ${statsFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
@@ -189,7 +181,7 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
         <Card>
           <CardContent className="py-6">
             <div className="flex items-center justify-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
               <p className="text-sm text-muted-foreground">Loading metrics...</p>
             </div>
           </CardContent>
@@ -220,25 +212,25 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
             title="CPU Usage"
             value={formatCpu(totalCpu)}
             subtitle="Total across containers"
-            icon={<Cpu className="h-5 w-5 text-primary" />}
+            icon={<Cpu className="size-5 text-primary" />}
           />
           <MetricCard
             title="Memory"
             value={formatBytes(totalMemoryUsage)}
             subtitle={`of ${formatBytes(totalMemoryLimit)}`}
-            icon={<MemoryStick className="h-5 w-5 text-primary" />}
+            icon={<MemoryStick className="size-5 text-primary" />}
           />
           <MetricCard
             title="Network In"
             value={formatBytes(totalNetworkRx)}
             subtitle="Total received"
-            icon={<Network className="h-5 w-5 text-primary" />}
+            icon={<Network className="size-5 text-primary" />}
           />
           <MetricCard
             title="Network Out"
             value={formatBytes(totalNetworkTx)}
             subtitle="Total sent"
-            icon={<HardDrive className="h-5 w-5 text-primary" />}
+            icon={<HardDrive className="size-5 text-primary" />}
           />
         </div>
       )}
@@ -246,7 +238,7 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Globe className="h-5 w-5" />
+            <Globe className="size-5" />
             Running Instances ({sortedLocations.length})
           </CardTitle>
         </CardHeader>
@@ -258,17 +250,19 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
           ) : (
             <div className="space-y-3">
               {sortedLocations.map((location, idx) => {
+                const nodeAddress = formatNodeAddress(location);
+                const isMaster = nodeAddress === masterNodeAddress;
                 const isStatsSource = statsNodeIp && location.ip.startsWith(statsNodeIp.split(':')[0]);
-                const isPrimary = idx === 0;
+                const isHighlighted = isMaster || isStatsSource;
                 return (
                   <div
                     key={idx}
                     className={`flex items-center justify-between p-3 rounded-lg border ${
-                      isStatsSource ? 'bg-primary/10 border-primary/30' : isPrimary ? 'bg-blue-500/5 border-blue-500/20' : 'bg-muted/30'
+                      isHighlighted ? 'bg-primary/10 border-primary/30' : 'bg-muted/30'
                     }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Server className={`h-4 w-4 ${isStatsSource ? 'text-primary' : isPrimary ? 'text-blue-500' : 'text-muted-foreground'}`} />
+                      <Server className={`size-4 ${isHighlighted ? 'text-primary' : 'text-muted-foreground'}`} />
                       <div>
                         <p className="font-medium text-sm">{location.ip}</p>
                         <p className="text-xs text-muted-foreground">
@@ -277,13 +271,13 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isPrimary && (
-                        <Badge variant="secondary" className="text-xs">
-                          Primary
+                      {isMaster && (
+                        <Badge variant="default" className="text-xs">
+                          Master
                         </Badge>
                       )}
                       {isStatsSource && (
-                        <Badge variant="default" className="text-xs">
+                        <Badge variant="secondary" className="text-xs">
                           Stats Source
                         </Badge>
                       )}

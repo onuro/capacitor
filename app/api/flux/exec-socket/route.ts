@@ -153,7 +153,7 @@ function executeViaSocket(
       socket.on('show', (data: string) => {
         if (typeof data === 'string') {
           output += data;
-          console.log('Output chunk:', data.slice(0, 200));
+          // console.log('Output chunk:', data.slice(0, 200));
 
           // Reset end timeout on each output
           if (endTimeoutId) clearTimeout(endTimeoutId);
@@ -175,6 +175,11 @@ function executeViaSocket(
                   // JSON not complete yet
                 }
               }
+            }
+
+            // Check for WP CLI success/error patterns
+            if (output.includes('Success:') || output.includes('Error:') || output.includes('Warning:')) {
+              return true;
             }
 
             // Check for shell prompt return (command finished)

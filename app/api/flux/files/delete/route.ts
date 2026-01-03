@@ -24,8 +24,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    const hasPort = nodeIp.includes(':');
-    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
+    // Extract just the IP and use Flux DNS format for reliable connectivity
+    const ip = nodeIp.split(':')[0];
+    const dashedIp = ip.replace(/\./g, '-');
+    const baseUrl = `https://${dashedIp}-16127.node.api.runonflux.io`;
 
     // Flux uses GET /apps/removeobject/:appname/:component/:filepath
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;

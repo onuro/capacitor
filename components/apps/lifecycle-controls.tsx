@@ -175,7 +175,7 @@ export function LifecycleControls({ appName, locations = [] }: LifecycleControls
               onClick={() => handleAction(action)}
               disabled={mutation.isPending}
             >
-              <Icon className="h-4 w-4" />
+              <Icon className="size-4" />
               {config.label}
             </Button>
           );
@@ -199,7 +199,7 @@ export function LifecycleControls({ appName, locations = [] }: LifecycleControls
                 className="flex-1"
                 onClick={() => setControlMode('global')}
               >
-                <Globe className="h-4 w-4 mr-2" />
+                <Globe className="size-4 mr-2" />
                 Global
               </Button>
               <Button
@@ -209,7 +209,7 @@ export function LifecycleControls({ appName, locations = [] }: LifecycleControls
                 onClick={() => setControlMode('local')}
                 disabled={locations.length === 0}
               >
-                <Server className="h-4 w-4 mr-2" />
+                <Server className="size-4 mr-2" />
                 Local
               </Button>
             </div>
@@ -257,7 +257,7 @@ export function LifecycleControls({ appName, locations = [] }: LifecycleControls
             >
               {mutation.isPending ? (
                 <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   Processing...
                 </>
               ) : (

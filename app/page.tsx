@@ -19,7 +19,7 @@ export default function Home() {
       <section className="flex-1 flex items-center justify-center px-4 py-16 md:py-24">
         <div className="container max-w-5xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6">
-            <Zap className="h-4 w-4" />
+            <Zap className="size-4" />
             Powered by FluxCloud
           </div>
 
@@ -39,7 +39,7 @@ export default function Home() {
             <Link href="/register">
               <Button size="lg" className="gap-2 text-lg px-8">
                 Deploy Now
-                <ArrowRight className="h-5 w-5" />
+                <ArrowRight className="size-5" />
               </Button>
             </Link>
             <a
@@ -68,7 +68,7 @@ export default function Home() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <Card>
               <CardHeader>
-                <Server className="h-10 w-10 text-primary mb-2" />
+                <Server className="size-10 text-primary mb-2" />
                 <CardTitle>Global Distribution</CardTitle>
                 <CardDescription>
                   Your app runs on multiple nodes worldwide for low latency and high availability
@@ -78,7 +78,7 @@ export default function Home() {
 
             <Card>
               <CardHeader>
-                <Shield className="h-10 w-10 text-primary mb-2" />
+                <Shield className="size-10 text-primary mb-2" />
                 <CardTitle>Decentralized & Secure</CardTitle>
                 <CardDescription>
                   No single point of failure. Your data and apps are distributed across the network
@@ -88,7 +88,7 @@ export default function Home() {
 
             <Card>
               <CardHeader>
-                <Globe className="h-10 w-10 text-primary mb-2" />
+                <Globe className="size-10 text-primary mb-2" />
                 <CardTitle>Free Domain</CardTitle>
                 <CardDescription>
                   Every app gets a free subdomain at yourapp.app.runonflux.io out of the box
@@ -98,7 +98,7 @@ export default function Home() {
 
             <Card>
               <CardHeader>
-                <Cpu className="h-10 w-10 text-primary mb-2" />
+                <Cpu className="size-10 text-primary mb-2" />
                 <CardTitle>Flexible Resources</CardTitle>
                 <CardDescription>
                   Choose exactly the CPU, RAM, and storage your application needs
@@ -108,7 +108,7 @@ export default function Home() {
 
             <Card>
               <CardHeader>
-                <HardDrive className="h-10 w-10 text-primary mb-2" />
+                <HardDrive className="size-10 text-primary mb-2" />
                 <CardTitle>Docker Native</CardTitle>
                 <CardDescription>
                   Deploy any Docker image directly. No complex configuration required
@@ -118,7 +118,7 @@ export default function Home() {
 
             <Card>
               <CardHeader>
-                <Network className="h-10 w-10 text-primary mb-2" />
+                <Network className="size-10 text-primary mb-2" />
                 <CardTitle>Load Balanced</CardTitle>
                 <CardDescription>
                   Built-in load balancing across all your instances automatically
@@ -140,7 +140,7 @@ export default function Home() {
           <Link href="/register">
             <Button size="lg" className="gap-2">
               Start Deploying
-              <ArrowRight className="h-5 w-5" />
+              <ArrowRight className="size-5" />
             </Button>
           </Link>
         </div>

@@ -5,8 +5,8 @@ export function Footer() {
     <footer className="border-t py-6 md:py-8">
       <div className="container flex flex-col items-center justify-between gap-4 md:flex-row">
         <div className="flex items-center gap-2">
-          <div className="flex h-6 w-6 items-center justify-center rounded bg-primary">
-            <Zap className="h-4 w-4 text-primary-foreground" />
+          <div className="flex size-6 items-center justify-center rounded bg-primary">
+            <Zap className="size-4 text-primary-foreground" />
           </div>
           <span className="text-sm font-medium">Capacitor</span>
         </div>

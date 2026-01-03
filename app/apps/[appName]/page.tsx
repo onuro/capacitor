@@ -62,7 +62,7 @@ export default function AppDetailPage({ params }: PageProps) {
     return (
       <main className="container py-8">
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Box className="h-12 w-12 text-muted-foreground mb-4" />
+          <Box className="size-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
           <p className="text-muted-foreground max-w-md mb-6">
             Connect your wallet to view and manage your applications.
@@ -77,7 +77,7 @@ export default function AppDetailPage({ params }: PageProps) {
     return (
       <main className="container py-8">
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <Loader2 className="size-8 animate-spin text-primary" />
         </div>
       </main>
     );
@@ -87,14 +87,14 @@ export default function AppDetailPage({ params }: PageProps) {
     return (
       <main className="container py-8">
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+          <AlertCircle className="size-12 text-destructive mb-4" />
           <h2 className="text-xl font-semibold mb-2">App Not Found</h2>
           <p className="text-muted-foreground mb-4">
             The application &quot;{appName}&quot; could not be found.
           </p>
           <Button asChild variant="outline">
             <Link href="/apps">
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="size-4" />
               Back to Apps
             </Link>
           </Button>
@@ -112,14 +112,14 @@ export default function AppDetailPage({ params }: PageProps) {
     <main className="container py-8">
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex items-start gap-3">
-            <Button asChild variant="ghost" size="icon" className="shrink-0 -ml-2">
-              <Link href="/apps">
-                <ArrowLeft className="h-5 w-5" />
+          <div className="flex items-center gap-5">
+            <div className="flex h-14 items-center rounded-md bg-primary/10 overflow-hidden">
+              <Link
+                href="/apps"
+                className="flex items-center justify-center h-full px-2 hover:bg-primary/20 transition-colors"
+              >
+                <ArrowLeft className="size-4 text-primary" />
               </Link>
-            </Button>
-            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10">
-              <Box className="h-7 w-7 text-primary" />
             </div>
             <div>
               <div className="flex items-center gap-3">
@@ -142,7 +142,7 @@ export default function AppDetailPage({ params }: PageProps) {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <ExternalLink className="h-4 w-4" />
+                <ExternalLink className="size-4" />
                 View on Flux
               </a>
             </Button>
@@ -162,22 +162,22 @@ export default function AppDetailPage({ params }: PageProps) {
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1.5">
-              <Globe className="h-4 w-4" />
+              <Globe className="size-4" />
               <span className="font-medium text-foreground">{app.instances}</span>
               <span>instances</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Cpu className="h-4 w-4" />
+              <Cpu className="size-4" />
               <span className="font-medium text-foreground">{totalCpu}</span>
               <span>CPU</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <MemoryStick className="h-4 w-4" />
+              <MemoryStick className="size-4" />
               <span className="font-medium text-foreground">{totalRam}</span>
               <span>MB</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <HardDrive className="h-4 w-4" />
+              <HardDrive className="size-4" />
               <span className="font-medium text-foreground">{totalHdd}</span>
               <span>GB</span>
             </div>

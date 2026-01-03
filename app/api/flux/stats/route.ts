@@ -125,11 +125,10 @@ export async function GET(request: NextRequest) {
   for (const nodeIp of ips) {
     for (const containerName of containerNames) {
       try {
-        // Handle IPs that may already include a port (e.g., "65.108.105.29:16177")
+        // Use port from location data if provided, otherwise default to 16127
         const hasPort = nodeIp.includes(':');
-        const nodeUrl = hasPort
-          ? `http://${nodeIp}/apps/appstats/${containerName}`
-          : `http://${nodeIp}:16127/apps/appstats/${containerName}`;
+        const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
+        const nodeUrl = `${baseUrl}/apps/appstats/${containerName}`;
 
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
@@ -166,6 +165,14 @@ export async function GET(request: NextRequest) {
           signal: AbortSignal.timeout(10000),
         });
 
+        // Check if response is OK and is JSON before parsing
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || !contentType?.includes('application/json')) {
+          const text = await response.text();
+          console.log(`[Stats] ${nodeIp} returned ${response.status}: ${text.slice(0, 100)}`);
+          continue; // Try next node
+        }
+
         const data = await response.json();
         console.log(`Response from ${nodeIp}:`, data.status, data.data?.name || 'no name');
 
@@ -188,7 +195,7 @@ export async function GET(request: NextRequest) {
               rawMemoryUsage: data.data.memory_stats?.usage,
               rawMemoryLimit: data.data.memory_stats?.limit,
               rawContainerName: data.data.name,
-              queriedUrl: `http://${nodeIp}${hasPort ? '' : ':16127'}/apps/appstats/${containerName}`,
+              queriedUrl: nodeUrl,
             },
           });
         }
