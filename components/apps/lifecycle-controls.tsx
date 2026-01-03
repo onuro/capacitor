@@ -29,22 +29,27 @@ import {
 } from '@/lib/api/flux-apps';
 import { isZelidAuthValid } from '@/lib/api/auth';
 import { useAuthStore } from '@/stores/auth';
+import { useResolvedNode } from '@/components/apps/node-picker';
 import { toast } from 'sonner';
 
 interface LifecycleControlsProps {
   appName: string;
   locations?: AppLocation[];
+  selectedNode: string;
 }
 
 type Action = 'start' | 'stop' | 'restart';
 type ControlMode = 'global' | 'local';
 
-export function LifecycleControls({ appName, locations = [] }: LifecycleControlsProps) {
+export function LifecycleControls({ appName, locations = [], selectedNode }: LifecycleControlsProps) {
   const [confirmAction, setConfirmAction] = useState<Action | null>(null);
   const [controlMode, setControlMode] = useState<ControlMode>('global');
   const [selectedInstance, setSelectedInstance] = useState<string>('');
   const { zelidauth } = useAuthStore();
   const queryClient = useQueryClient();
+
+  // Resolve "auto" to actual node for initializing local mode
+  const { resolvedNode } = useResolvedNode(appName, selectedNode);
 
   const actionConfig = {
     start: {
@@ -171,12 +176,11 @@ export function LifecycleControls({ appName, locations = [] }: LifecycleControls
             <Button
               key={action}
               variant={config.variant}
-              size="sm"
               onClick={() => handleAction(action)}
               disabled={mutation.isPending}
             >
               <Icon className="size-4" />
-              {config.label}
+              {/* {config.label} */}
             </Button>
           );
         })}
@@ -206,7 +210,13 @@ export function LifecycleControls({ appName, locations = [] }: LifecycleControls
                 variant={controlMode === 'local' ? 'default' : 'ghost'}
                 size="sm"
                 className="flex-1"
-                onClick={() => setControlMode('local')}
+                onClick={() => {
+                  setControlMode('local');
+                  // Initialize with centrally selected node
+                  if (resolvedNode && !selectedInstance) {
+                    setSelectedInstance(resolvedNode);
+                  }
+                }}
                 disabled={locations.length === 0}
               >
                 <Server className="size-4 mr-2" />

@@ -1,17 +1,9 @@
 'use client';
 
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   getAppStatsFromNodes,
   formatBytes,
@@ -20,6 +12,7 @@ import {
 import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
 import { useNodeSelection } from '@/hooks/use-node-selection';
+import { useResolvedNode } from '@/components/apps/node-picker';
 import {
   Cpu,
   MemoryStick,
@@ -34,6 +27,7 @@ import {
 
 interface MetricsDashboardProps {
   appName: string;
+  selectedNode: string;
 }
 
 interface MetricCardProps {
@@ -65,27 +59,26 @@ function MetricCard({ title, value, subtitle, icon }: MetricCardProps) {
   );
 }
 
-export function MetricsDashboard({ appName }: MetricsDashboardProps) {
+export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProps) {
   const { zelidauth } = useAuthStore();
-  const [selectedNode, setSelectedNode] = useState<string>('auto');
 
-  // Use unified node selection hook (but we manage selectedNode separately for "auto" mode)
+  // Use unified node selection hook for locations and master detection
   const {
     sortedLocations,
     masterNodeAddress,
     isLoading: nodesLoading,
-    getNodeLabel,
   } = useNodeSelection({ appName, autoSelectMaster: false });
+
+  // Resolve "auto" to actual node
+  const { resolvedNode } = useResolvedNode(appName, selectedNode);
 
   const nodeIps = sortedLocations.map((l) => formatNodeAddress(l));
 
   // Determine which nodes to query based on selection
-  // In "auto" mode, prioritize master node first, then fall back to others
-  const nodesToQuery = selectedNode === 'auto'
-    ? masterNodeAddress
-      ? [masterNodeAddress, ...nodeIps.filter(ip => ip !== masterNodeAddress)]
-      : nodeIps
-    : [selectedNode];
+  // If resolved to a specific node, query it first; otherwise try all
+  const nodesToQuery = resolvedNode
+    ? [resolvedNode, ...nodeIps.filter(ip => ip !== resolvedNode)]
+    : nodeIps;
 
   // Fetch stats from nodes - tries each until one returns valid data
   const {
@@ -147,34 +140,15 @@ export function MetricsDashboard({ appName }: MetricsDashboardProps) {
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={selectedNode} onValueChange={setSelectedNode}>
-            <SelectTrigger className="w-[220px] h-9 text-xs">
-              <SelectValue placeholder="Select node" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="auto">Auto (detected node)</SelectItem>
-              {sortedLocations.map((loc, idx) => {
-                const ipPort = formatNodeAddress(loc);
-                const label = getNodeLabel(loc, idx);
-                return (
-                  <SelectItem key={ipPort} value={ipPort}>
-                    {ipPort} {label}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetchStats()}
-            disabled={statsFetching}
-          >
-            <RefreshCw className={`size-4 ${statsFetching ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => refetchStats()}
+          disabled={statsFetching}
+        >
+          <RefreshCw className={`size-4 ${statsFetching ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
       </div>
 
       {isStatsLoading ? (

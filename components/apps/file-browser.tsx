@@ -41,6 +41,7 @@ import { getAppSpecification } from '@/lib/api/flux-apps';
 import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
 import { useNodeSelection } from '@/hooks/use-node-selection';
+import { useResolvedNode } from '@/components/apps/node-picker';
 import { toast } from 'sonner';
 import {
   Folder,
@@ -58,7 +59,6 @@ import {
   Edit3,
   Save,
   ArrowLeft,
-  Server,
   X,
   Trash2,
   Square,
@@ -232,6 +232,7 @@ function getHighlighter(): Promise<Highlighter> {
 
 interface FileBrowserProps {
   appName: string;
+  selectedNode: string;
 }
 
 function getFileIcon(file: FileInfo) {
@@ -251,7 +252,7 @@ function getFileIcon(file: FileInfo) {
   return <File className="size-4 text-gray-400" />;
 }
 
-export function FileBrowser({ appName }: FileBrowserProps) {
+export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   const [currentPath, setCurrentPath] = useState('/');
   const [editingFile, setEditingFile] = useState<FileInfo | null>(null);
   const [editContent, setEditContent] = useState<string>('');
@@ -261,23 +262,17 @@ export function FileBrowser({ appName }: FileBrowserProps) {
   const [selectedComponent, setSelectedComponent] = useState<string>('');
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
 
-  // Use unified node selection hook
-  const {
-    selectedNode,
-    setSelectedNode,
-    sortedLocations,
-    isLoading: nodesLoading,
-    getNodeLabel,
-    masterNodeAddress,
-  } = useNodeSelection({ appName });
+  // Use unified node selection hook for locations
+  const { sortedLocations, isLoading: nodesLoading } = useNodeSelection({ appName, autoSelectMaster: false });
 
-  // Build fallback list: selected node first, then others
+  // Resolve "auto" to actual node
+  const { resolvedNode } = useResolvedNode(appName, selectedNode);
+
+  // Build fallback list: resolved node first, then others
   const allNodeIps = sortedLocations.map((l) => formatNodeAddress(l));
-  const nodeIpsForQuery = selectedNode
-    ? [selectedNode, ...allNodeIps.filter(ip => ip !== selectedNode)]
-    : masterNodeAddress
-      ? [masterNodeAddress, ...allNodeIps.filter(ip => ip !== masterNodeAddress)]
-      : allNodeIps;
+  const nodeIpsForQuery = resolvedNode
+    ? [resolvedNode, ...allNodeIps.filter(ip => ip !== resolvedNode)]
+    : allNodeIps;
   const [highlightedHtml, setHighlightedHtml] = useState<string>('');
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -331,7 +326,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
   // Auto-select first component if not set
   const activeComponent = selectedComponent || components[0] || '';
   // For single-file operations (download/save/delete), use the selected node
-  const activeNode = selectedNode || nodeIpsForQuery[0] || '';
+  const activeNode = resolvedNode || nodeIpsForQuery[0] || '';
 
   // Fetch files - pass all node IPs for fallback
   const {
@@ -647,34 +642,7 @@ export function FileBrowser({ appName }: FileBrowserProps) {
                   </SelectContent>
                 </Select>
               )}
-
-              <Select
-                value={activeNode}
-                onValueChange={(val) => {
-                  setSelectedNode(val);
-                  setCurrentPath('/');
-                  setSelectedItems(new Set());
-                }}
-              >
-                <SelectTrigger className="w-[200px] h-9 text-xs">
-                  <Server className="size-3 mr-1" />
-                  <SelectValue placeholder="Select node" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortedLocations.map((loc, idx) => {
-                    const ipPort = formatNodeAddress(loc);
-                    const label = getNodeLabel(loc, idx);
-                    return (
-                      <SelectItem key={ipPort} value={ipPort}>
-                        {ipPort} {label}
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
             </div>
-
-
           </div>
         </CardHeader>
 

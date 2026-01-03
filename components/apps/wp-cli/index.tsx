@@ -2,17 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
 import { useNodeSelection } from '@/hooks/use-node-selection';
-import { Loader2, Server, AlertCircle, Plug, Palette, Users, FileWarning } from 'lucide-react';
+import { useResolvedNode } from '@/components/apps/node-picker';
+import { Loader2, AlertCircle, Plug, Palette, Users, FileWarning } from 'lucide-react';
 import { PluginManager } from './plugin-manager';
 import { ThemeManager } from './theme-manager';
 import { UserManager } from './user-manager';
@@ -20,19 +13,17 @@ import { ErrorLogsViewer } from './error-logs';
 
 interface WPCliDashboardProps {
   appName: string;
+  selectedNode: string;
 }
 
-export function WPCliDashboard({ appName }: WPCliDashboardProps) {
+export function WPCliDashboard({ appName, selectedNode }: WPCliDashboardProps) {
   const { zelidauth } = useAuthStore();
 
-  // Use unified node selection hook with 'wp' as preferred component for domain extraction
-  const {
-    selectedNode,
-    setSelectedNode,
-    sortedLocations,
-    isLoading: nodesLoading,
-    getNodeLabel,
-  } = useNodeSelection({ appName });
+  // Use unified node selection hook for locations
+  const { sortedLocations, isLoading: nodesLoading } = useNodeSelection({ appName, autoSelectMaster: false });
+
+  // Resolve "auto" to actual node
+  const { resolvedNode } = useResolvedNode(appName, selectedNode);
 
   // Not authenticated
   if (!zelidauth) {
@@ -79,48 +70,18 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header with node selection */}
+      {/* Header */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <span className="text-2xl font-bold text-blue-600">WP</span>
-              WordPress Management
-            </CardTitle>
-            <Select value={selectedNode} onValueChange={setSelectedNode}>
-              <SelectTrigger>
-                <Server className="size-4 mr-2" />
-                <SelectValue placeholder="Select node" />
-              </SelectTrigger>
-              <SelectContent>
-                {sortedLocations.map((loc, idx) => {
-                  const ipPort = formatNodeAddress(loc);
-                  const label = getNodeLabel(loc, idx);
-                  return (
-                    <SelectItem key={ipPort} value={ipPort}>
-                      {ipPort} {label}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
-          </div>
+          <CardTitle className="flex items-center gap-2">
+            <span className="text-2xl font-bold text-blue-600">WP</span>
+            WordPress Management
+          </CardTitle>
         </CardHeader>
-        {/* {locations.length > 1 && (
-          <CardContent className="pt-0">
-            <Alert>
-              <AlertTriangle className="size-4" />
-              <AlertDescription>
-                This app has {locations.length} instances. Changes made here only affect the
-                selected node and won&apos;t automatically sync to other instances.
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-        )} */}
       </Card>
 
       {/* Management Tabs */}
-      {selectedNode && (
+      {resolvedNode && (
         <Tabs defaultValue="plugins" className="space-y-4">
           <TabsList>
             <TabsTrigger value="plugins" className="flex items-center gap-2">
@@ -142,19 +103,19 @@ export function WPCliDashboard({ appName }: WPCliDashboardProps) {
           </TabsList>
 
           <TabsContent value="plugins">
-            <PluginManager appName={appName} nodeIp={selectedNode} />
+            <PluginManager appName={appName} nodeIp={resolvedNode} />
           </TabsContent>
 
           <TabsContent value="themes">
-            <ThemeManager appName={appName} nodeIp={selectedNode} />
+            <ThemeManager appName={appName} nodeIp={resolvedNode} />
           </TabsContent>
 
           <TabsContent value="users">
-            <UserManager appName={appName} nodeIp={selectedNode} />
+            <UserManager appName={appName} nodeIp={resolvedNode} />
           </TabsContent>
 
           <TabsContent value="logs">
-            <ErrorLogsViewer appName={appName} nodeIp={selectedNode} />
+            <ErrorLogsViewer appName={appName} nodeIp={resolvedNode} />
           </TabsContent>
         </Tabs>
       )}

@@ -18,10 +18,12 @@ import { getAppSpecification } from '@/lib/api/flux-apps';
 import { formatNodeAddress } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth';
 import { useNodeSelection } from '@/hooks/use-node-selection';
-import { Loader2, Search, Download, RefreshCw, Terminal, Server, Box } from 'lucide-react';
+import { useResolvedNode } from '@/components/apps/node-picker';
+import { Loader2, Search, Download, RefreshCw, Terminal, Box } from 'lucide-react';
 
 interface LogViewerProps {
   appName: string;
+  selectedNode: string;
 }
 
 // Format timestamp with relative date (Today, Yesterday, X days ago) + time
@@ -100,7 +102,7 @@ function LogMessage({ message }: { message: string }) {
   return <span className="break-all">{parts}</span>;
 }
 
-export function LogViewer({ appName }: LogViewerProps) {
+export function LogViewer({ appName, selectedNode }: LogViewerProps) {
   const [lines, setLines] = useState('100');
   const [filter, setFilter] = useState('');
   const [autoScroll, setAutoScroll] = useState(true);
@@ -108,23 +110,17 @@ export function LogViewer({ appName }: LogViewerProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const zelidauth = useAuthStore((state) => state.zelidauth);
 
-  // Use unified node selection hook
-  const {
-    selectedNode,
-    setSelectedNode,
-    sortedLocations,
-    isLoading: nodesLoading,
-    getNodeLabel,
-    masterNodeAddress,
-  } = useNodeSelection({ appName });
+  // Use unified node selection hook for locations
+  const { sortedLocations } = useNodeSelection({ appName, autoSelectMaster: false });
 
-  // Build fallback list: selected node first, then others
+  // Resolve "auto" to actual node
+  const { resolvedNode } = useResolvedNode(appName, selectedNode);
+
+  // Build fallback list: resolved node first, then others
   const allNodeIps = sortedLocations.map((l) => formatNodeAddress(l));
-  const nodeIpsForQuery = selectedNode
-    ? [selectedNode, ...allNodeIps.filter(ip => ip !== selectedNode)]
-    : masterNodeAddress
-      ? [masterNodeAddress, ...allNodeIps.filter(ip => ip !== masterNodeAddress)]
-      : allNodeIps;
+  const nodeIpsForQuery = resolvedNode
+    ? [resolvedNode, ...allNodeIps.filter(ip => ip !== resolvedNode)]
+    : allNodeIps;
 
   // Fetch app specification to get compose info
   const { data: appSpecData } = useQuery({
@@ -156,7 +152,7 @@ export function LogViewer({ appName }: LogViewerProps) {
     refetch,
     isFetching,
   } = useQuery({
-    queryKey: ['appLogs', containerName, selectedNode, lines],
+    queryKey: ['appLogs', containerName, resolvedNode, lines],
     queryFn: () => getAppLogs(nodeIpsForQuery, containerName, parseInt(lines), zelidauth || undefined),
     refetchInterval: 10000,
     staleTime: 5000,
@@ -208,25 +204,6 @@ export function LogViewer({ appName }: LogViewerProps) {
                       {name}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            )}
-            {sortedLocations.length > 1 && (
-              <Select value={selectedNode} onValueChange={setSelectedNode}>
-                <SelectTrigger className="w-48">
-                  <Server className="size-4 mr-2" />
-                  <SelectValue placeholder="Select node" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sortedLocations.map((loc, idx) => {
-                    const ipPort = formatNodeAddress(loc);
-                    const label = getNodeLabel(loc, idx);
-                    return (
-                      <SelectItem key={ipPort} value={ipPort}>
-                        {ipPort} {label}
-                      </SelectItem>
-                    );
-                  })}
                 </SelectContent>
               </Select>
             )}

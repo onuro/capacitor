@@ -1,6 +1,6 @@
 'use client';
 
-import { use } from 'react';
+import { use, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { LogViewer } from '@/components/apps/log-viewer';
 import { MetricsDashboard } from '@/components/apps/metrics-dashboard';
 import { FileBrowser } from '@/components/apps/file-browser';
 import { WPCliDashboard, isWordPressApp } from '@/components/apps/wp-cli';
+import { NodePicker } from '@/components/apps/node-picker';
 import { ConnectButton } from '@/components/wallet/connect-button';
 import { getAppSpecification, getAppLocations } from '@/lib/api/flux-apps';
 import { useAuthStore } from '@/stores/auth';
@@ -34,6 +35,7 @@ interface PageProps {
 export default function AppDetailPage({ params }: PageProps) {
   const { appName } = use(params);
   const { isAuthenticated } = useAuthStore();
+  const [selectedNode, setSelectedNode] = useState<string>('auto');
 
   const {
     data: specData,
@@ -135,8 +137,14 @@ export default function AppDetailPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <LifecycleControls appName={appName} locations={locations} />
-            <Button variant="outline" size="sm" asChild>
+            <LifecycleControls appName={appName} locations={locations} selectedNode={selectedNode} />
+            <NodePicker
+              appName={appName}
+              value={selectedNode}
+              onChange={setSelectedNode}
+              size="sm"
+            />
+            <Button variant="outline" asChild>
               <a
                 href={`https://home.runonflux.io/apps/globalapps/${appName}`}
                 target="_blank"
@@ -185,15 +193,15 @@ export default function AppDetailPage({ params }: PageProps) {
         </div>
 
         <TabsContent value="metrics">
-          <MetricsDashboard appName={appName} />
+          <MetricsDashboard appName={appName} selectedNode={selectedNode} />
         </TabsContent>
 
         <TabsContent value="logs">
-          <LogViewer appName={appName} />
+          <LogViewer appName={appName} selectedNode={selectedNode} />
         </TabsContent>
 
         <TabsContent value="files" className='flex-col'>
-          <FileBrowser appName={appName} />
+          <FileBrowser appName={appName} selectedNode={selectedNode} />
         </TabsContent>
 
         <TabsContent value="config">
@@ -260,7 +268,7 @@ export default function AppDetailPage({ params }: PageProps) {
 
         {showWpTab && (
           <TabsContent value="wordpress">
-            <WPCliDashboard appName={appName} />
+            <WPCliDashboard appName={appName} selectedNode={selectedNode} />
           </TabsContent>
         )}
       </Tabs>
