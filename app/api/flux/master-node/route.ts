@@ -3,34 +3,20 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-/**
- * FDM (Flux Daemon Master) regions to try in order
- */
-const FDM_REGIONS = ['eu', 'usa', 'asia'];
-
-/**
- * Get FDM index based on app name's first letter
- * a-g or other: 1, h-n: 2, o-u: 3, v-z: 4
- */
-function getFdmIndex(appName: string): number {
-  const firstChar = appName.charAt(0).toLowerCase();
-  if (firstChar >= 'h' && firstChar <= 'n') return 2;
-  if (firstChar >= 'o' && firstChar <= 'u') return 3;
-  if (firstChar >= 'v' && firstChar <= 'z') return 4;
-  return 1;
+interface HaproxyField {
+  objType: string;
+  proxyId: number;
+  id: number;
+  field: { pos: number; name: string };
+  processNum: number;
+  tags: Record<string, string>;
+  value: { type: string; value: string | number };
 }
 
 /**
- * Build FDM URL for a given region and app name
- */
-function buildFdmUrl(region: string, appName: string): string {
-  const index = getFdmIndex(appName);
-  return `http://fdm-${region}-1-${index}.runonflux.io:16130/appips/${appName}`;
-}
-
-/**
- * Get the master node IP for a Flux app from FDM service.
- * The first IP in the response is the primary/master node.
+ * Get the master node IP for a Flux app by checking HAProxy statistics.
+ * The master is the server with act=1 (active), backups have bck=1.
+ * This returns the correct Flux API port (not app port).
  */
 export async function GET(request: NextRequest) {
   const appName = request.nextUrl.searchParams.get('appName');
@@ -42,56 +28,66 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Try each FDM region until one succeeds
-  for (const region of FDM_REGIONS) {
-    const fdmUrl = buildFdmUrl(region, appName);
+  const statsUrl = `https://${appName}.app.runonflux.io/fluxstatistics?scope=${appName}apprunonfluxio;json;norefresh`;
 
-    try {
-      console.log(`[master-node] Trying FDM ${region}: ${fdmUrl}`);
+  try {
+    console.log(`[master-node] Fetching HAProxy stats: ${statsUrl}`);
 
-      const response = await fetch(fdmUrl, {
-        method: 'GET',
-        signal: AbortSignal.timeout(5000),
-        headers: {
-          'Accept': 'application/json',
-        },
+    const response = await fetch(statsUrl, {
+      method: 'GET',
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      console.log(`[master-node] HAProxy stats returned ${response.status}`);
+      return NextResponse.json({
+        status: 'error',
+        message: `HAProxy stats returned ${response.status}`,
       });
-
-      if (!response.ok) {
-        console.log(`[master-node] FDM ${region} returned ${response.status}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      // FDM returns { data: { ips: ["IP:port", ...] } } or { ips: [...] }
-      const ips = data?.data?.ips || data?.ips || [];
-
-      if (ips.length > 0) {
-        const masterIp = ips[0];
-        console.log(`[master-node] Found master for ${appName}: ${masterIp} (via ${region})`);
-
-        return NextResponse.json({
-          status: 'success',
-          data: {
-            masterIp,
-            allIps: ips,
-            region,
-            appName,
-          },
-        });
-      }
-
-      console.log(`[master-node] FDM ${region} returned empty IPs`);
-    } catch (error) {
-      console.log(`[master-node] FDM ${region} failed:`, error instanceof Error ? error.message : error);
-      continue;
     }
-  }
 
-  // All FDM regions failed
-  return NextResponse.json({
-    status: 'error',
-    message: 'Could not determine master node from FDM service',
-  });
+    const data: HaproxyField[][] = await response.json();
+
+    // Find the server with act=1 (active/master)
+    for (const server of data) {
+      const actField = server.find(
+        (f) => f.field.name === 'act' && f.value.value === 1
+      );
+
+      if (actField) {
+        // Found active server, get its svname (IP:port)
+        const svnameField = server.find((f) => f.field.name === 'svname');
+        if (svnameField && typeof svnameField.value.value === 'string') {
+          const masterIp = svnameField.value.value;
+          console.log(`[master-node] Found master for ${appName}: ${masterIp} (act=1)`);
+
+          return NextResponse.json({
+            status: 'success',
+            data: {
+              masterIp,
+              appName,
+              source: 'haproxy',
+            },
+          });
+        }
+      }
+    }
+
+    // No active server found
+    console.log(`[master-node] No active server found for ${appName}`);
+    return NextResponse.json({
+      status: 'error',
+      message: 'No active master node found in HAProxy stats',
+    });
+  } catch (error) {
+    console.error(`[master-node] Error:`, error);
+
+    return NextResponse.json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to detect master node',
+    });
+  }
 }

@@ -29,7 +29,7 @@ export interface UseNodeSelectionResult {
 
 /**
  * Unified hook for node selection across all components.
- * Detects master node via FDM (Flux Daemon Master) service.
+ * Detects master node via HAProxy statistics (act=1 is master).
  */
 export function useNodeSelection({
   appName,
@@ -59,24 +59,16 @@ export function useNodeSelection({
     });
   }, [locations]);
 
-  // Get master node from FDM service
+  // Get master node from HAProxy stats (returns IP:port with correct Flux API port)
   const { data: masterNodeData, isLoading: masterLoading } = useQuery({
     queryKey: ['masterNode', appName],
     queryFn: () => getMasterNode(appName),
     enabled: !!appName,
-    staleTime: 60000,
+    staleTime: 30000,
   });
 
-  // Extract just the IP from master node (FDM returns app port, not Flux API port)
-  const masterNodeIp = masterNodeData?.data?.masterIp?.split(':')[0] || null;
-
-  // Find matching location by IP
-  const matchingLocation = useMemo(() => {
-    if (!masterNodeIp) return null;
-    return sortedLocations.find((loc) => loc.ip.split(':')[0] === masterNodeIp) || null;
-  }, [masterNodeIp, sortedLocations]);
-
-  const masterNodeAddress = matchingLocation ? formatNodeAddress(matchingLocation) : null;
+  // HAProxy returns full IP:port with correct Flux API port
+  const masterNodeAddress = masterNodeData?.data?.masterIp || null;
 
   // Auto-select node when locations load
   useEffect(() => {

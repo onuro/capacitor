@@ -13,7 +13,8 @@
       "Bash(find:*)",
       "Bash(cat:*)",
       "Bash(body='{\"\"appname\"\":\"\"wp_wordpress1757803028930\"\",\"\"cmd\"\":[\"\"echo\"\",\"\"test\"\"]}')",
-      "Bash(\"http://88.99.52.117:16127/apps/appexec\" )"
+      "Bash(\"http://88.99.52.117:16127/apps/appexec\" )",
+      "Bash(grep:*)"
     ]
   }
 }
