@@ -157,12 +157,85 @@ const authObj = {
 headers['zelidauth'] = JSON.stringify(authObj);
 ```
 
-### Primary Node Detection
+### Master Node Detection & Selection
 
-Flux apps run on multiple nodes. To deterministically select a "primary" node (like Syncthing leader election):
+Flux apps run on multiple nodes. The codebase uses a centralized approach for node selection with HAProxy-based master detection.
+
+#### Centralized Node Picker Component
+
+The `NodePicker` component (`components/apps/node-picker.tsx`) provides unified node selection across all features:
 
 ```typescript
-// Sort by broadcastedAt (earliest first), IP as tiebreaker
+import { NodePicker, useResolvedNode } from '@/components/apps/node-picker';
+
+// In a page component - uses controlled "auto" | "IP:port" value
+const [selectedNode, setSelectedNode] = useState<string>('auto');
+
+<NodePicker
+  appName={appName}
+  value={selectedNode}
+  onChange={setSelectedNode}
+  size="sm" // or "default"
+/>
+
+// In child components - resolve "auto" to actual node IP
+const { resolvedNode, isMaster, isLoading } = useResolvedNode(appName, selectedNode);
+```
+
+#### useNodeSelection Hook
+
+The core hook (`hooks/use-node-selection.ts`) handles:
+- Fetching app locations
+- Sorting by broadcastedAt (with 5s clock skew tolerance)
+- Master node detection via HAProxy
+- Providing node labels ("master" indicator)
+
+```typescript
+import { useNodeSelection } from '@/hooks/use-node-selection';
+
+const {
+  selectedNode,      // Current selection (IP:port)
+  setSelectedNode,   // Setter
+  sortedLocations,   // Sorted AppLocation[]
+  masterNodeAddress, // Master IP:port from HAProxy (or null)
+  isLoading,
+  getNodeLabel,      // Returns "(master)" for master node
+} = useNodeSelection({ appName, autoSelectMaster: true });
+```
+
+#### HAProxy Master Detection
+
+Master node is detected via HAProxy statistics (`/fluxstatistics`). The active server has `act=1`:
+
+```typescript
+// API endpoint: /api/flux/master-node?appName=myapp
+// Returns: { status: 'success', data: { masterIp: '1.2.3.4:16127', appName, source: 'haproxy' } }
+
+import { getMasterNode } from '@/lib/api/flux-node-detect';
+
+const response = await getMasterNode(appName);
+if (response.status === 'success') {
+  const masterIp = response.data.masterIp; // e.g., "65.108.105.29:16177"
+}
+```
+
+#### Node Address Formatting
+
+Use `formatNodeAddress` utility to convert AppLocation to IP:port string:
+
+```typescript
+import { formatNodeAddress } from '@/lib/utils';
+
+// Handles cases where loc.ip might already include port
+// Falls back to loc.port or default 16127
+const ipPort = formatNodeAddress(location); // "1.2.3.4:16127"
+```
+
+#### Legacy: Manual Sorting Approach
+
+For cases without HAProxy, sort by broadcastedAt (earliest first), IP as tiebreaker:
+
+```typescript
 const sortedLocations = [...locations].sort((a, b) => {
   const timeA = new Date(a.broadcastedAt).getTime();
   const timeB = new Date(b.broadcastedAt).getTime();
@@ -178,26 +251,28 @@ const primaryNode = sortedLocations[0];
 
 ### Important Notes
 
-1. **CORS**: Browser requests to Flux nodes are blocked by CORS. Use Next.js API routes as proxies.
+1. **Node Selection Pattern**: The app detail page uses a controlled `selectedNode` state with "auto" as default. Child components (MetricsDashboard, LogViewer, FileBrowser, WPCliDashboard) receive `selectedNode` as prop and use `useResolvedNode(appName, selectedNode)` to resolve "auto" to actual node IP.
 
-2. **POST Body Format**: Some POST endpoints need stringified JSON with `Content-Type: text/plain`
+2. **CORS**: Browser requests to Flux nodes are blocked by CORS. Use Next.js API routes as proxies.
+
+3. **POST Body Format**: Some POST endpoints need stringified JSON with `Content-Type: text/plain`
    ```typescript
    await axios.post(url, JSON.stringify(data), {
      headers: { 'Content-Type': 'text/plain' }
    });
    ```
 
-3. **Node Ports**: Standard port is 16127, but nodes may have custom ports (e.g., `65.108.105.29:16177`)
+4. **Node Ports**: Standard port is 16127, but nodes may have custom ports (e.g., `65.108.105.29:16177`)
 
-4. **URL Encoding**: File/folder paths must be URL-encoded as single parameters, NOT as path segments
+5. **URL Encoding**: File/folder paths must be URL-encoded as single parameters, NOT as path segments
    - Wrong: `/apps/downloadfile/myapp/main/folder/file.txt`
    - Correct: `/apps/downloadfile/myapp/main/folder%2Ffile.txt`
 
-5. **App Names**: Must be lowercase, alphanumeric only, 3-30 characters
+6. **App Names**: Must be lowercase, alphanumeric only, 3-30 characters
 
-6. **Legacy Apps**: Apps with version <= 3 don't have compose array; use app name as component
+7. **Legacy Apps**: Apps with version <= 3 don't have compose array; use app name as component
 
-7. **Upload Response**: File upload returns streaming progress data, not JSON. Check HTTP status for success.
+8. **Upload Response**: File upload returns streaming progress data, not JSON. Check HTTP status for success.
 
 ### WordPress/WP-CLI Integration
 
@@ -281,24 +356,33 @@ This Capacitor project has Flux APIs in:
 - `lib/api/flux-metrics.ts` - Performance metrics
 - `lib/api/flux-files.ts` - File operations (listFiles, downloadFile, saveFile)
 - `lib/api/flux-wp-cli.ts` - WP-CLI commands (plugins, themes, users, error logs)
+- `lib/api/flux-node-detect.ts` - Master node detection (HAProxy), serving node detection
 - `lib/api/apps.ts` - Registration APIs
 - `lib/api/client.ts` - Base axios client with auth
+
+#### Hooks
+- `hooks/use-node-selection.ts` - Unified node selection with master detection
 
 #### Next.js API Proxies (to avoid CORS)
 - `app/api/flux/stats/route.ts` - Proxy for container stats
 - `app/api/flux/files/route.ts` - Proxy for directory listing
 - `app/api/flux/files/download/route.ts` - Proxy for file download
 - `app/api/flux/files/upload/route.ts` - Proxy for file upload
+- `app/api/flux/files/delete/route.ts` - Proxy for file deletion
 - `app/api/flux/exec-socket/route.ts` - Socket.io exec proxy (for WP-CLI commands)
+- `app/api/flux/master-node/route.ts` - HAProxy-based master node detection
+- `app/api/flux/detect-node/route.ts` - Detect serving node via FDMSERVERID cookie
+- `app/api/flux/logs/route.ts` - Proxy for container logs
 
 #### Components
 - `components/apps/app-card.tsx` - App summary card
+- `components/apps/node-picker.tsx` - Centralized node selector with "auto" mode
 - `components/apps/lifecycle-controls.tsx` - Start/stop/restart buttons
 - `components/apps/log-viewer.tsx` - Real-time log display
-- `components/apps/metrics-dashboard.tsx` - CPU/RAM/Network stats with node selector
+- `components/apps/metrics-dashboard.tsx` - CPU/RAM/Network stats
 - `components/apps/file-browser.tsx` - File manager with view/edit capabilities
 - `components/apps/wp-cli/` - WordPress management dashboard
-  - `index.tsx` - Main dashboard with node selector and sub-tabs
+  - `index.tsx` - Main dashboard with sub-tabs
   - `plugin-manager.tsx` - Plugin management UI
   - `theme-manager.tsx` - Theme management UI
   - `user-manager.tsx` - User management UI
@@ -403,9 +487,14 @@ Key files for Flux integration:
 - [lib/api/flux-metrics.ts](lib/api/flux-metrics.ts)
 - [lib/api/flux-files.ts](lib/api/flux-files.ts)
 - [lib/api/flux-wp-cli.ts](lib/api/flux-wp-cli.ts) - WP-CLI API client
+- [lib/api/flux-node-detect.ts](lib/api/flux-node-detect.ts) - Master/serving node detection
 - [lib/api/apps.ts](lib/api/apps.ts)
 - [lib/types/app-spec.ts](lib/types/app-spec.ts)
+- [lib/utils.ts](lib/utils.ts) - formatNodeAddress utility
+- [hooks/use-node-selection.ts](hooks/use-node-selection.ts) - Centralized node selection hook
 - [app/api/flux/](app/api/flux/) - Next.js API proxies
+- [app/api/flux/master-node/route.ts](app/api/flux/master-node/route.ts) - HAProxy master detection
 - [app/api/flux/exec-socket/route.ts](app/api/flux/exec-socket/route.ts) - Socket.io exec
 - [components/apps/](components/apps/) - UI components
+- [components/apps/node-picker.tsx](components/apps/node-picker.tsx) - Centralized node picker
 - [components/apps/wp-cli/](components/apps/wp-cli/) - WordPress management dashboard

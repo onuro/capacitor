@@ -110,6 +110,14 @@ export default function AppDetailPage({ params }: PageProps) {
   const totalHdd = app.compose.reduce((sum, c) => sum + c.hdd, 0);
   const showWpTab = isWordPressApp(app);
 
+  const customDomain = app.compose
+    .flatMap(c => c.domains || [])
+    .find(d => d && !d.includes('.app.runonflux.io'));
+
+  const displayTitle = showWpTab && app.description
+    ? app.description
+    : app.name;
+
   return (
     <main className="container py-8">
       <div className="mb-6">
@@ -125,13 +133,24 @@ export default function AppDetailPage({ params }: PageProps) {
             </div>
             <div>
               <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{app.name}</h1>
+                <h1 className="text-2xl font-bold">{displayTitle}</h1>
                 <Badge variant={isRunning ? 'default' : 'secondary'}>
                   {isRunning ? `${locations.length} Running` : 'Stopped'}
                 </Badge>
               </div>
               <p className="text-muted-foreground mt-1">
-                {app.description || 'No description'}
+                {customDomain ? (
+                  <a
+                    href={`https://${customDomain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-primary hover:underline transition-colors"
+                  >
+                    {customDomain}
+                  </a>
+                ) : (
+                  app.description || 'No description'
+                )}
               </p>
             </div>
           </div>

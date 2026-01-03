@@ -66,7 +66,7 @@ export function NodePicker({
         <Server className="size-3.5 mr-1.5" />
         <SelectValue placeholder={isLoading ? 'Loading...' : 'Select node'} />
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent align="end">
         <SelectItem value="auto">
           Auto {masterNodeAddress ? '(master)' : '(first available)'}
         </SelectItem>
