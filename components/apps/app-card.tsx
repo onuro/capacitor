@@ -58,18 +58,18 @@ export function AppCard({ app }: AppCardProps) {
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 overflow-hidden">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 overflow-hidden">
               {faviconSrc ? (
                 <img
                   src={faviconSrc}
                   alt={`${app.name} favicon`}
                   width={24}
                   height={24}
-                  className="h-6 w-6 rounded"
+                  className="size-6 rounded"
                   onError={handleFaviconError}
                 />
               ) : (
-                <Box className="h-5 w-5 text-primary" />
+                <Box className="size-5 text-primary" />
               )}
             </div>
             <div>
@@ -82,7 +82,7 @@ export function AppCard({ app }: AppCardProps) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 hover:underline text-primary"
                   >
-                    <Globe className="h-3 w-3" />
+                    <Globe className="size-3" />
                     {domain}
                   </a>
                 ) : (
@@ -99,15 +99,15 @@ export function AppCard({ app }: AppCardProps) {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1.5">
-            <Cpu className="h-4 w-4" />
+            <Cpu className="size-4" />
             <span>{totalCpu} CPU</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <MemoryStick className="h-4 w-4" />
+            <MemoryStick className="size-4" />
             <span>{totalRam} MB RAM</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <HardDrive className="h-4 w-4" />
+            <HardDrive className="size-4" />
             <span>{totalHdd} GB SSD</span>
           </div>
         </div>
@@ -132,7 +132,7 @@ export function AppCard({ app }: AppCardProps) {
               target="_blank"
               rel="noopener noreferrer"
             >
-              <ExternalLink className="h-4 w-4" />
+              <ExternalLink className="size-4" />
             </a>
           </Button>
         </div>

@@ -10,14 +10,14 @@ export interface AppLogEntry {
 }
 
 /**
- * Get application logs from a specific node via proxy
- * @param nodeIp - IP address of the Flux node
+ * Get application logs from Flux nodes via proxy
+ * @param nodeIps - IP address(es) of the Flux node(s) - will try each until one succeeds
  * @param appName - Name of the application
  * @param lines - Number of lines to retrieve (default 100)
  * @param zelidauth - Authentication token
  */
 export async function getAppLogs(
-  nodeIp: string,
+  nodeIps: string | string[],
   appName: string,
   lines: number = 100,
   zelidauth?: string
@@ -26,8 +26,11 @@ export async function getAppLogs(
     return { status: 'error', message: 'Authentication required' };
   }
 
+  // Support both single IP and array of IPs for fallback
+  const nodeIpParam = Array.isArray(nodeIps) ? nodeIps.join(',') : nodeIps;
+
   const params = new URLSearchParams({
-    nodeIp,
+    nodeIp: nodeIpParam,
     appName,
     lines: String(lines),
   });

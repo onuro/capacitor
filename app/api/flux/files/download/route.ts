@@ -26,8 +26,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const hasPort = nodeIp.includes(':');
-    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
+    // Extract just the IP and use Flux DNS format for reliable connectivity
+    const ip = nodeIp.split(':')[0];
+    const dashedIp = ip.replace(/\./g, '-');
+    const baseUrl = `https://${dashedIp}-16127.node.api.runonflux.io`;
 
     // Build the download URL - Flux uses /apps/downloadfile/:appname/:component/:file
     // The file path must be URL encoded as a single parameter

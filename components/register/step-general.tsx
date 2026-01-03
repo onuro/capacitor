@@ -107,13 +107,13 @@ export function StepGeneral({ data, onChange, onNext }: StepGeneralProps) {
               className={errors.name ? 'border-red-500' : ''}
             />
             {isCheckingName && (
-              <Loader2 className="absolute right-3 top-2.5 h-5 w-5 animate-spin text-muted-foreground" />
+              <Loader2 className="absolute right-3 top-2.5 size-5 animate-spin text-muted-foreground" />
             )}
             {!isCheckingName && nameAvailable === true && data.name && (
-              <CheckCircle className="absolute right-3 top-2.5 h-5 w-5 text-green-500" />
+              <CheckCircle className="absolute right-3 top-2.5 size-5 text-green-500" />
             )}
             {!isCheckingName && nameAvailable === false && (
-              <XCircle className="absolute right-3 top-2.5 h-5 w-5 text-red-500" />
+              <XCircle className="absolute right-3 top-2.5 size-5 text-red-500" />
             )}
           </div>
           {errors.name && (
@@ -197,7 +197,7 @@ export function StepGeneral({ data, onChange, onNext }: StepGeneralProps) {
       <div className="flex justify-end pt-4">
         <Button onClick={handleNext} className="gap-2">
           Next: Component Config
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="size-4" />
         </Button>
       </div>
     </div>

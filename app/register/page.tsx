@@ -16,8 +16,8 @@ export default function RegisterPage() {
         <Card className="text-center">
           <CardHeader>
             <div className="mx-auto mb-4">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10">
-                <Wallet className="h-8 w-8 text-primary" />
+              <div className="inline-flex items-center justify-center size-16 rounded-full bg-primary/10">
+                <Wallet className="size-8 text-primary" />
               </div>
             </div>
             <CardTitle className="text-2xl">Connect Your Wallet</CardTitle>
@@ -35,19 +35,19 @@ export default function RegisterPage() {
               <h3 className="font-medium mb-4">Why connect a wallet?</h3>
               <ul className="text-sm text-muted-foreground space-y-2 text-left max-w-sm mx-auto">
                 <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <CheckCircle className="size-4 text-green-500 flex-shrink-0" />
                   Securely sign your app registration
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <CheckCircle className="size-4 text-green-500 flex-shrink-0" />
                   Prove ownership of your deployed apps
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <CheckCircle className="size-4 text-green-500 flex-shrink-0" />
                   Pay for hosting with FLUX tokens
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <CheckCircle className="size-4 text-green-500 flex-shrink-0" />
                   Manage your apps anytime
                 </li>
               </ul>

@@ -136,7 +136,7 @@ export function ConnectButton() {
     return (
       <div className="flex items-center gap-2">
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-secondary rounded-md">
-          <div className="w-2 h-2 bg-green-500 rounded-full" />
+          <div className="size-2 bg-green-500 rounded-full" />
           <span className="text-sm font-medium">{truncateAddress(zelid)}</span>
         </div>
         <Button
@@ -145,7 +145,7 @@ export function ConnectButton() {
           onClick={handleDisconnect}
           className="gap-2"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="size-4" />
           <span className="hidden sm:inline">Disconnect</span>
         </Button>
       </div>
@@ -156,9 +156,9 @@ export function ConnectButton() {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button className="gap-2">
-          <Wallet className="h-4 w-4" />
+          <Wallet className="size-4" />
           Connect Wallet
-          <ChevronDown className="h-4 w-4" />
+          <ChevronDown className="size-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
@@ -184,14 +184,14 @@ export function ConnectButton() {
             disabled={isConnecting}
           >
             {isConnecting && selectedWallet === 'metamask' ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="size-6 animate-spin" />
             ) : (
               <Image
                 src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"
                 alt="MetaMask"
                 width={24}
                 height={24}
-                className="h-6 w-6"
+                className="size-6"
               />
             )}
             <div className="flex flex-col items-start">
@@ -210,14 +210,14 @@ export function ConnectButton() {
             disabled={isConnecting}
           >
             {isConnecting && selectedWallet === 'walletconnect' ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="size-6 animate-spin" />
             ) : (
               <Image
                 src="https://avatars.githubusercontent.com/u/37784886"
                 alt="WalletConnect"
                 width={24}
                 height={24}
-                className="h-6 w-6 rounded"
+                className="size-6 rounded"
               />
             )}
             <div className="flex flex-col items-start">
@@ -236,9 +236,9 @@ export function ConnectButton() {
             disabled={isConnecting || !isSSPAvailable()}
           >
             {isConnecting && selectedWallet === 'ssp' ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="size-6 animate-spin" />
             ) : (
-              <div className="h-6 w-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+              <div className="size-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
                 SSP
               </div>
             )}
@@ -258,7 +258,7 @@ export function ConnectButton() {
             disabled={isConnecting}
           >
             {isConnecting && selectedWallet === 'zelcore' ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
+              <Loader2 className="size-6 animate-spin" />
             ) : (
               <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="size-7 shrink-0">
                 <path d="M19.9005 39.8011C30.8913 39.8011 39.8011 30.8913 39.8011 19.9005C39.8011 8.90977 30.8913 0 19.9005 0C8.90977 0 0 8.90977 0 19.9005C0 30.8913 8.90977 39.8011 19.9005 39.8011Z" fill="#1B63EF" />

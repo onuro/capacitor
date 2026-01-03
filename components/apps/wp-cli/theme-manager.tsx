@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,6 @@ import type { BaseWpCliProps } from './types';
 
 export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
   const { zelidauth } = useAuthStore();
-  const queryClient = useQueryClient();
   const [installSlug, setInstallSlug] = useState('');
   const [installDialogOpen, setInstallDialogOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -59,7 +58,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
     },
     onSuccess: () => {
       toast.success('Theme activated');
-      queryClient.invalidateQueries({ queryKey: ['wp-themes', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to activate: ${error.message}`),
   });
@@ -74,7 +73,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
     onSuccess: () => {
       toast.success('Theme deleted');
       setConfirmDelete(null);
-      queryClient.invalidateQueries({ queryKey: ['wp-themes', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to delete: ${error.message}`),
   });
@@ -90,12 +89,12 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
       toast.success('Theme installed');
       setInstallDialogOpen(false);
       setInstallSlug('');
-      queryClient.invalidateQueries({ queryKey: ['wp-themes', appName] });
+      refetch();
     },
     onError: (error: Error) => toast.error(`Failed to install: ${error.message}`),
   });
 
-  const themes = (data as WPTheme[]) || [];
+  const themes = Array.isArray(data) ? data : [];
   const isAnyMutating =
     activateMutation.isPending || deleteMutation.isPending || installMutation.isPending;
 
@@ -104,7 +103,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5" />
+            <Palette className="size-5" />
             Themes ({themes.length})
           </CardTitle>
           <div className="flex gap-2">
@@ -114,10 +113,10 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
               onClick={() => refetch()}
               disabled={isFetching}
             >
-              <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
             <Button size="sm" onClick={() => setInstallDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="size-4 mr-1" />
               Install
             </Button>
           </div>
@@ -126,7 +125,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
       <CardContent>
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin" />
+            <Loader2 className="size-6 animate-spin" />
           </div>
         ) : themes.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">No themes found</p>
@@ -164,7 +163,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
                         disabled={isAnyMutating}
                         title="Activate"
                       >
-                        <Check className="h-4 w-4" />
+                        <Check className="size-4" />
                       </Button>
                     )}
                     {theme.status !== 'active' && (
@@ -175,7 +174,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
                         disabled={isAnyMutating}
                         title="Delete"
                       >
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="size-4 text-destructive" />
                       </Button>
                     )}
                   </div>
@@ -215,7 +214,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
               disabled={!installSlug.trim() || installMutation.isPending}
             >
               {installMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               )}
               Install
             </Button>
@@ -243,7 +242,7 @@ export function ThemeManager({ appName, nodeIp }: BaseWpCliProps) {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending && (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                <Loader2 className="size-4 mr-2 animate-spin" />
               )}
               Delete
             </Button>

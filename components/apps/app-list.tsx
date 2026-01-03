@@ -29,7 +29,7 @@ export function AppList() {
   if (!isAuthenticated) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Box className="h-12 w-12 text-muted-foreground mb-4" />
+        <Box className="size-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
         <p className="text-muted-foreground max-w-md mb-6">
           Connect your wallet to view and manage your deployed applications.
@@ -42,7 +42,7 @@ export function AppList() {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <Loader2 className="size-8 animate-spin text-primary mb-4" />
         <p className="text-muted-foreground">Loading your apps...</p>
       </div>
     );
@@ -51,7 +51,7 @@ export function AppList() {
   if (isError) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+        <AlertCircle className="size-12 text-destructive mb-4" />
         <h3 className="text-lg font-semibold mb-2">Failed to Load Apps</h3>
         <p className="text-muted-foreground max-w-md mb-4">
           {error instanceof Error ? error.message : 'An error occurred while fetching your apps.'}
@@ -68,7 +68,7 @@ export function AppList() {
   if (apps.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
-        <Box className="h-12 w-12 text-muted-foreground mb-4" />
+        <Box className="size-12 text-muted-foreground mb-4" />
         <h3 className="text-lg font-semibold mb-2">No Apps Yet</h3>
         <p className="text-muted-foreground max-w-md mb-4">
           You haven&apos;t deployed any applications to FluxCloud yet.

@@ -149,7 +149,7 @@ export function StepComponent({ data, onChange, onNext, onBack }: StepComponentP
               onClick={addPort}
               className="gap-1"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="size-4" />
               Add Port
             </Button>
           </div>
@@ -192,7 +192,7 @@ export function StepComponent({ data, onChange, onNext, onBack }: StepComponentP
                     onClick={() => removePort(index)}
                     className="mt-5"
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <Trash2 className="size-4 text-destructive" />
                   </Button>
                 )}
               </div>
@@ -213,7 +213,7 @@ export function StepComponent({ data, onChange, onNext, onBack }: StepComponentP
               onClick={addEnvVar}
               className="gap-1"
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="size-4" />
               Add Variable
             </Button>
           </div>
@@ -242,7 +242,7 @@ export function StepComponent({ data, onChange, onNext, onBack }: StepComponentP
                     size="icon"
                     onClick={() => removeEnvVar(index)}
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <Trash2 className="size-4 text-destructive" />
                   </Button>
                 </div>
               ))}
@@ -352,12 +352,12 @@ export function StepComponent({ data, onChange, onNext, onBack }: StepComponentP
 
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack} className="gap-2">
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="size-4" />
           Back
         </Button>
         <Button onClick={handleNext} className="gap-2">
           Next: Review
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="size-4" />
         </Button>
       </div>
     </div>

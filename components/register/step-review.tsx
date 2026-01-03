@@ -184,13 +184,13 @@ export function StepReview({ formData, onBack, onSignatureComplete }: StepReview
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             {isValidating ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="size-5 animate-spin" />
             ) : validationResult === 'success' ? (
-              <CheckCircle className="h-5 w-5 text-green-500" />
+              <CheckCircle className="size-5 text-green-500" />
             ) : validationResult === 'error' ? (
-              <XCircle className="h-5 w-5 text-red-500" />
+              <XCircle className="size-5 text-red-500" />
             ) : (
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
+              <AlertCircle className="size-5 text-yellow-500" />
             )}
             Specification Validation
           </CardTitle>
@@ -226,7 +226,7 @@ export function StepReview({ formData, onBack, onSignatureComplete }: StepReview
             <div>
               <p className="text-sm text-muted-foreground">Instances</p>
               <p className="font-medium flex items-center gap-1">
-                <Server className="h-4 w-4" />
+                <Server className="size-4" />
                 {appSpec.instances}
               </p>
             </div>
@@ -249,21 +249,21 @@ export function StepReview({ formData, onBack, onSignatureComplete }: StepReview
           {/* Resources */}
           <div className="grid grid-cols-3 gap-4">
             <div className="flex items-center gap-2">
-              <Cpu className="h-4 w-4 text-muted-foreground" />
+              <Cpu className="size-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">CPU</p>
                 <p className="font-medium">{appSpec.compose[0].cpu} vCores</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <MemoryStick className="h-4 w-4 text-muted-foreground" />
+              <MemoryStick className="size-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">RAM</p>
                 <p className="font-medium">{appSpec.compose[0].ram} MB</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <HardDrive className="h-4 w-4 text-muted-foreground" />
+              <HardDrive className="size-4 text-muted-foreground" />
               <div>
                 <p className="text-xs text-muted-foreground">Storage</p>
                 <p className="font-medium">{appSpec.compose[0].hdd} GB</p>
@@ -305,14 +305,14 @@ export function StepReview({ formData, onBack, onSignatureComplete }: StepReview
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
-            <DollarSign className="h-5 w-5" />
+            <DollarSign className="size-5" />
             Estimated Cost (Monthly)
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isCalculatingPrice ? (
             <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
               <span className="text-muted-foreground">Calculating price...</span>
             </div>
           ) : priceUSD !== null && priceFlux !== null ? (
@@ -341,7 +341,7 @@ export function StepReview({ formData, onBack, onSignatureComplete }: StepReview
 
       <div className="flex justify-between pt-4">
         <Button variant="outline" onClick={onBack} className="gap-2">
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="size-4" />
           Back
         </Button>
         <Button
@@ -351,7 +351,7 @@ export function StepReview({ formData, onBack, onSignatureComplete }: StepReview
         >
           {isSigning ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="size-4 animate-spin" />
               Signing...
             </>
           ) : (

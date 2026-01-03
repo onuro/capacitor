@@ -24,18 +24,21 @@ export interface DirectoryListing {
  * @param zelidauth - Auth token
  * @param appName - Name of the application
  * @param component - Component name (for compose apps)
- * @param nodeIp - Node IP to query
+ * @param nodeIps - Node IP(s) to query (string or array - will try each until one succeeds)
  * @param path - Path within the app storage (default: root)
  */
 export async function listFiles(
   zelidauth: string,
   appName: string,
   component: string,
-  nodeIp: string,
+  nodeIps: string | string[],
   path: string = '/'
 ): Promise<FluxApiResponse<DirectoryListing>> {
+  // Support both single IP and array of IPs for fallback
+  const nodeIpParam = Array.isArray(nodeIps) ? nodeIps.join(',') : nodeIps;
+
   const params = new URLSearchParams({
-    nodeIp,
+    nodeIp: nodeIpParam,
     appName,
     component,
     folder: path,
