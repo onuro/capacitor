@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Extract just the IP and use Flux DNS format for reliable connectivity
-    const ip = nodeIp.split(':')[0];
+    // Extract IP and port, use Flux DNS format for reliable connectivity
+    const [ip, port = '16127'] = nodeIp.split(':');
     const dashedIp = ip.replace(/\./g, '-');
-    const baseUrl = `https://${dashedIp}-16127.node.api.runonflux.io`;
+    const baseUrl = `https://${dashedIp}-${port}.node.api.runonflux.io`;
 
     // Flux uses POST /ioutils/fileupload/volume/:appname/:component/:folder
     // The folder is the directory path (URL encoded), filename goes in FormData
