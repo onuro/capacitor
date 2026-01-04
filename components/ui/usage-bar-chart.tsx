@@ -11,7 +11,7 @@ interface UsageBarChartProps {
 
 export function UsageBarChart({
   value,
-  totalBars = 40,
+  totalBars = 48,
   height = 31
 }: UsageBarChartProps) {
   // Calculate how many bars should be filled based on percentage
