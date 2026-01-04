@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -261,6 +261,8 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<string>('');
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const [showRetryHint, setShowRetryHint] = useState(false);
 
   // Use unified node selection hook for locations
   const { sortedLocations, isLoading: nodesLoading } = useNodeSelection({ appName, autoSelectMaster: false });
@@ -328,7 +330,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   // For single-file operations (download/save/delete), use the selected node
   const activeNode = resolvedNode || nodeIpsForQuery[0] || '';
 
-  // Fetch files - pass all node IPs for fallback
+  // Fetch files - pass all node IPs for fallback with retry logic
   const {
     data,
     isLoading,
@@ -336,12 +338,41 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     error,
     refetch,
     isFetching,
+    failureCount,
   } = useQuery({
     queryKey: ['appFiles', appName, activeComponent, selectedNode, currentPath],
     queryFn: () => listFiles(zelidauth!, appName, activeComponent, nodeIpsForQuery, currentPath),
     enabled: !!zelidauth && !!activeComponent && nodeIpsForQuery.length > 0,
     staleTime: 30000,
+    retry: 2, // Retry 2 times on failure
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
   });
+
+  // Show retry hint after loading for more than 3 seconds
+  useEffect(() => {
+    if (isFetching) {
+      setShowRetryHint(false);
+      const timer = setTimeout(() => setShowRetryHint(true), 3000);
+      return () => clearTimeout(timer);
+    } else {
+      setShowRetryHint(false);
+    }
+  }, [isFetching]);
+
+  // Track retry count for UI feedback
+  useEffect(() => {
+    if (failureCount > 0) {
+      setRetryCount(failureCount);
+    } else if (!isFetching && !isError) {
+      setRetryCount(0);
+    }
+  }, [failureCount, isFetching, isError]);
+
+  // Manual retry handler
+  const handleRetry = useCallback(() => {
+    setRetryCount(0);
+    refetch();
+  }, [refetch]);
 
   const handleNavigate = (file: FileInfo) => {
     if (file.isDirectory) {
@@ -701,21 +732,39 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
             </div>
           )}
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="size-6 animate-spin text-primary" />
+          {isLoading || isFetching ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Loader2 className="size-8 animate-spin text-primary" />
+              <div className="text-center">
+                <p className="text-sm font-medium">
+                  {failureCount > 0 ? `Retrying... (attempt ${failureCount + 1}/3)` : 'Loading files...'}
+                </p>
+                {showRetryHint && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Connecting to node, this may take a moment...
+                  </p>
+                )}
+              </div>
             </div>
           ) : isError || data?.status === 'error' ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <p>Failed to load files.</p>
-              <p className="text-xs mt-1">
-                {data?.message || (error instanceof Error ? error.message : 'Make sure the app is running and you have access.')}
-              </p>
-              {data?.message?.includes('volume not found') && (
-                <p className="text-xs mt-2 text-yellow-600">
-                  This app may not have persistent storage configured.
+            <div className="flex flex-col items-center justify-center py-12 gap-4">
+              <div className="size-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <X className="size-6 text-destructive" />
+              </div>
+              <div className="text-center max-w-sm">
+                <p className="font-medium">Unable to load files</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {data?.message?.includes('volume not found')
+                    ? 'This app may not have persistent storage configured.'
+                    : data?.message?.includes('fetch failed') || error?.message?.includes('fetch failed')
+                    ? 'Could not connect to the app node. The node may be temporarily unavailable.'
+                    : data?.message || (error instanceof Error ? error.message : 'Please check that the app is running and try again.')}
                 </p>
-              )}
+              </div>
+              <Button onClick={handleRetry} variant="outline" className="mt-2">
+                <RefreshCw className="size-4 mr-2" />
+                Try Again
+              </Button>
             </div>
           ) : files.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">

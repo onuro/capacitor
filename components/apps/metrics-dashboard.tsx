@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -101,10 +102,15 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
   const nodeIps = sortedLocations.map((l) => formatNodeAddress(l));
 
   // Determine which nodes to query based on selection
-  // If resolved to a specific node, query it first; otherwise try all
-  const nodesToQuery = resolvedNode
-    ? [resolvedNode, ...nodeIps.filter(ip => ip !== resolvedNode)]
-    : nodeIps;
+  // Always prioritize master node when known, even if not the "resolved" selection
+  // This ensures stats come from the responsive master node
+  const nodesToQuery = useMemo(() => {
+    const priorityNode = resolvedNode || masterNodeAddress;
+    if (priorityNode) {
+      return [priorityNode, ...nodeIps.filter(ip => ip !== priorityNode)];
+    }
+    return nodeIps;
+  }, [resolvedNode, masterNodeAddress, nodeIps]);
 
   // Fetch stats from nodes - tries each until one returns valid data
   const {

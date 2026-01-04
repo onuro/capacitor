@@ -44,6 +44,32 @@ function calculateCpuPercent(stats: DockerStats): number {
   return 0;
 }
 
+// Retry helper with exponential backoff
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number,
+  retryDelay: number = 500
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt < maxRetries - 1) {
+        console.log(`[Stats] Retry ${attempt + 1}/${maxRetries} for ${url} after ${retryDelay}ms`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        retryDelay *= 1.5; // Increase delay for next retry
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 function transformDockerStats(rawStats: DockerStats, containerName: string, hddLimitGB?: number) {
   // Calculate network totals
   let rxBytes = 0;
@@ -147,8 +173,40 @@ export async function GET(request: NextRequest) {
   console.log('Container names to try:', containerNames);
   console.log('Starting node iteration...');
 
+  // Build headers once
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (zelidauth) {
+    // Parse zelidauth and convert to JSON for nodes
+    // Supports both query string format (zelid=xxx&...) and colon format (zelid:sig:phrase)
+    const params = new URLSearchParams(zelidauth);
+    let zelid = params.get('zelid');
+    let signature = params.get('signature');
+    let loginPhrase = params.get('loginPhrase');
+
+    if (!zelid || !signature || !loginPhrase) {
+      const parts = zelidauth.split(':');
+      if (parts.length >= 3) {
+        zelid = parts[0];
+        signature = parts[1];
+        loginPhrase = parts.slice(2).join(':');
+      }
+    }
+
+    if (zelid && signature && loginPhrase) {
+      headers['zelidauth'] = JSON.stringify({ zelid, signature, loginPhrase });
+    } else {
+      headers['zelidauth'] = zelidauth;
+    }
+  }
+
   // Try each node and container name until we get a successful response with data
-  for (const nodeIp of ips) {
+  // First node (master) gets 3 retries, others get 1 retry
+  for (let nodeIndex = 0; nodeIndex < ips.length; nodeIndex++) {
+    const nodeIp = ips[nodeIndex];
+    const maxRetries = nodeIndex === 0 ? 3 : 1; // Master node gets more retries
+
     for (const containerName of containerNames) {
       try {
         // Use port from location data if provided, otherwise default to 16127
@@ -156,47 +214,24 @@ export async function GET(request: NextRequest) {
         const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
         const nodeUrl = `${baseUrl}/apps/appstats/${containerName}`;
 
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        if (zelidauth) {
-          // Parse zelidauth and convert to JSON for nodes
-          // Supports both query string format (zelid=xxx&...) and colon format (zelid:sig:phrase)
-          const params = new URLSearchParams(zelidauth);
-          let zelid = params.get('zelid');
-          let signature = params.get('signature');
-          let loginPhrase = params.get('loginPhrase');
+        console.log(`Trying node: ${nodeIp} -> ${nodeUrl} (max retries: ${maxRetries})`);
 
-          if (!zelid || !signature || !loginPhrase) {
-            const parts = zelidauth.split(':');
-            if (parts.length >= 3) {
-              zelid = parts[0];
-              signature = parts[1];
-              loginPhrase = parts.slice(2).join(':');
-            }
-          }
-
-          if (zelid && signature && loginPhrase) {
-            headers['zelidauth'] = JSON.stringify({ zelid, signature, loginPhrase });
-          } else {
-            headers['zelidauth'] = zelidauth;
-          }
-        }
-
-        console.log(`Trying node: ${nodeIp} -> ${nodeUrl}`);
-
-        const response = await fetch(nodeUrl, {
-          method: 'GET',
-          headers,
-          signal: AbortSignal.timeout(10000),
-        });
+        const response = await fetchWithRetry(
+          nodeUrl,
+          {
+            method: 'GET',
+            headers,
+            signal: AbortSignal.timeout(5000), // Shorter timeout per attempt
+          },
+          maxRetries
+        );
 
         // Check if response is OK and is JSON before parsing
         const contentType = response.headers.get('content-type');
         if (!response.ok || !contentType?.includes('application/json')) {
           const text = await response.text();
           console.log(`[Stats] ${nodeIp} returned ${response.status}: ${text.slice(0, 100)}`);
-          continue; // Try next node
+          continue; // Try next container/node
         }
 
         const data = await response.json();
