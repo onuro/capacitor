@@ -1,17 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { detectMasterNode } from '@/lib/flux-haproxy';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
-
-interface HaproxyField {
-  objType: string;
-  proxyId: number;
-  id: number;
-  field: { pos: number; name: string };
-  processNum: number;
-  tags: Record<string, string>;
-  value: { type: string; value: string | number };
-}
 
 /**
  * Get the master node IP for a Flux app by checking HAProxy statistics.
@@ -28,55 +19,23 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const statsUrl = `https://${appName}.app.runonflux.io/fluxstatistics?scope=${appName}apprunonfluxio;json;norefresh`;
-
   try {
-    console.log(`[master-node] Fetching HAProxy stats: ${statsUrl}`);
+    console.log(`[master-node] Detecting master for ${appName}...`);
 
-    const response = await fetch(statsUrl, {
-      method: 'GET',
-      signal: AbortSignal.timeout(10000),
-      headers: {
-        'Accept': 'application/json',
-      },
-    });
+    const masterIp = await detectMasterNode(appName, 10000);
 
-    if (!response.ok) {
-      console.log(`[master-node] HAProxy stats returned ${response.status}`);
+    if (masterIp) {
+      console.log(`[master-node] Found master for ${appName}: ${masterIp}`);
       return NextResponse.json({
-        status: 'error',
-        message: `HAProxy stats returned ${response.status}`,
+        status: 'success',
+        data: {
+          masterIp,
+          appName,
+          source: 'haproxy',
+        },
       });
     }
 
-    const data: HaproxyField[][] = await response.json();
-
-    // Find the server with act=1 (active/master)
-    for (const server of data) {
-      const actField = server.find(
-        (f) => f.field.name === 'act' && f.value.value === 1
-      );
-
-      if (actField) {
-        // Found active server, get its svname (IP:port)
-        const svnameField = server.find((f) => f.field.name === 'svname');
-        if (svnameField && typeof svnameField.value.value === 'string') {
-          const masterIp = svnameField.value.value;
-          console.log(`[master-node] Found master for ${appName}: ${masterIp} (act=1)`);
-
-          return NextResponse.json({
-            status: 'success',
-            data: {
-              masterIp,
-              appName,
-              source: 'haproxy',
-            },
-          });
-        }
-      }
-    }
-
-    // No active server found
     console.log(`[master-node] No active server found for ${appName}`);
     return NextResponse.json({
       status: 'error',

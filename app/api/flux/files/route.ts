@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { detectMasterNode } from '@/lib/flux-haproxy';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,9 +14,101 @@ interface FileInfo {
   modifiedAt: string;
 }
 
+interface TryNodeResult {
+  success: boolean;
+  response?: NextResponse;
+  error?: string;
+}
+
+/**
+ * Try to fetch files from a single node.
+ */
+async function tryNode(
+  nodeIp: string,
+  headers: Record<string, string>,
+  appName: string,
+  component: string,
+  folder: string
+): Promise<TryNodeResult> {
+  try {
+    const hasPort = nodeIp.includes(':');
+    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
+
+    let endpoint = `/apps/getfolderinfo/${appName}/${component}`;
+    if (folder && folder !== '/') {
+      const cleanFolder = folder.startsWith('/') ? folder.slice(1) : folder;
+      endpoint += `/${encodeURIComponent(cleanFolder)}`;
+    }
+
+    const nodeUrl = baseUrl + endpoint;
+    console.log(`[Files] Trying ${nodeIp}...`);
+
+    const response = await fetch(nodeUrl, {
+      method: 'GET',
+      headers,
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.log(`[Files] ${nodeIp} returned ${response.status}: ${text.slice(0, 100)}`);
+      return { success: false, error: `Node ${nodeIp} returned ${response.status}` };
+    }
+
+    const responseText = await response.text();
+
+    // Check for HTML response (error page)
+    if (responseText.trim().startsWith('<')) {
+      console.log(`[Files] ${nodeIp} returned HTML error page`);
+      return { success: false, error: `Node ${nodeIp} returned error page` };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      console.log(`[Files] ${nodeIp} returned invalid JSON`);
+      return { success: false, error: `Node ${nodeIp} returned invalid JSON` };
+    }
+
+    if (data.status === 'success') {
+      console.log(`[Files] SUCCESS from ${nodeIp}`);
+      const files: FileInfo[] = (data.data || []).map((file: FileInfo) => ({
+        name: file.name,
+        size: file.size || 0,
+        isDirectory: file.isDirectory || false,
+        modifiedAt: file.modifiedAt || '',
+        permissions: file.isDirectory ? 'drwxr-xr-x' : '-rw-r--r--',
+      }));
+
+      return {
+        success: true,
+        response: NextResponse.json({
+          status: 'success',
+          data: { path: folder || '/', files },
+          nodeIp,
+        }),
+      };
+    }
+
+    const errorMessage = data.message || data.data?.message || 'Unknown error';
+    console.log(`[Files] ${nodeIp} returned error: ${errorMessage}`);
+    return { success: false, error: errorMessage };
+  } catch (error) {
+    console.log(`[Files] ${nodeIp} failed:`, error instanceof Error ? error.message : error);
+    return { success: false, error: error instanceof Error ? error.message : 'Connection failed' };
+  }
+}
+
+/**
+ * Sleep helper for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  // Support both single nodeIp and comma-separated nodeIps for fallback
   const nodeIpParam = searchParams.get('nodeIp') || searchParams.get('nodeIps');
   const appName = searchParams.get('appName');
   const component = searchParams.get('component');
@@ -64,87 +157,54 @@ export async function GET(request: NextRequest) {
     headers['zelidauth'] = zelidauth;
   }
 
-  // Try each node until one succeeds
+  // 1. Detect master node via HAProxy
+  console.log(`[Files] Detecting master node for ${appName}...`);
+  const masterIp = await detectMasterNode(appName);
+  if (masterIp) {
+    console.log(`[Files] Master node detected: ${masterIp}`);
+  } else {
+    console.log(`[Files] No master detected, using client-provided nodes`);
+  }
+
+  // 2. Reorder nodes: master first, then others
+  const orderedNodes = masterIp
+    ? [masterIp, ...nodeIps.filter(ip => ip !== masterIp)]
+    : nodeIps;
+
   let lastError = '';
-  for (const nodeIp of nodeIps) {
-    try {
-      // Use port from location data if provided, otherwise default to 16127
-      const hasPort = nodeIp.includes(':');
-      const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
 
-      // Build path: /apps/getfolderinfo/appname/component/folder
-      let endpoint = `/apps/getfolderinfo/${appName}/${component}`;
-      if (folder && folder !== '/') {
-        const cleanFolder = folder.startsWith('/') ? folder.slice(1) : folder;
-        endpoint += `/${encodeURIComponent(cleanFolder)}`;
+  // 3. If we have a master, try it with retries (3 attempts, 2s delay)
+  if (masterIp && orderedNodes.length > 0) {
+    const masterNode = orderedNodes[0];
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`[Files] Master attempt ${attempt}/3 for ${masterNode}`);
+      const result = await tryNode(masterNode, headers, appName, component, folder);
+
+      if (result.success && result.response) {
+        return result.response;
       }
 
-      const nodeUrl = baseUrl + endpoint;
-      console.log(`[Files] Trying ${nodeIp}...`);
+      lastError = result.error || 'Unknown error';
 
-      const response = await fetch(nodeUrl, {
-        method: 'GET',
-        headers,
-        signal: AbortSignal.timeout(10000), // Shorter timeout for fallback
-      });
-
-      // Check if response is OK
-      if (!response.ok) {
-        const text = await response.text();
-        console.log(`[Files] ${nodeIp} returned ${response.status}: ${text.slice(0, 100)}`);
-        lastError = `Node ${nodeIp} returned ${response.status}`;
-        continue; // Try next node
+      // Wait before retry (unless last attempt)
+      if (attempt < 3) {
+        console.log(`[Files] Retrying master in 2s...`);
+        await sleep(2000);
       }
-
-      const responseText = await response.text();
-
-      // Check for HTML response (error page)
-      if (responseText.trim().startsWith('<')) {
-        console.log(`[Files] ${nodeIp} returned HTML error page`);
-        lastError = `Node ${nodeIp} returned error page`;
-        continue; // Try next node
-      }
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-      } catch {
-        console.log(`[Files] ${nodeIp} returned invalid JSON`);
-        lastError = `Node ${nodeIp} returned invalid JSON`;
-        continue; // Try next node
-      }
-
-      if (data.status === 'success') {
-        console.log(`[Files] SUCCESS from ${nodeIp}`);
-        // Transform the response to match our interface
-        const files: FileInfo[] = (data.data || []).map((file: FileInfo) => ({
-          name: file.name,
-          size: file.size || 0,
-          isDirectory: file.isDirectory || false,
-          modifiedAt: file.modifiedAt || '',
-          permissions: file.isDirectory ? 'drwxr-xr-x' : '-rw-r--r--',
-        }));
-
-        return NextResponse.json({
-          status: 'success',
-          data: {
-            path: folder || '/',
-            files,
-          },
-          nodeIp,
-        });
-      }
-
-      // Flux returned error
-      const errorMessage = data.message || data.data?.message || 'Unknown error';
-      console.log(`[Files] ${nodeIp} returned error: ${errorMessage}`);
-      lastError = errorMessage;
-      continue; // Try next node
-    } catch (error) {
-      console.log(`[Files] ${nodeIp} failed:`, error instanceof Error ? error.message : error);
-      lastError = error instanceof Error ? error.message : 'Connection failed';
-      continue; // Try next node
     }
+    console.log(`[Files] Master exhausted after 3 attempts, trying fallback nodes...`);
+  }
+
+  // 4. Fall back to other nodes (one attempt each)
+  const fallbackNodes = masterIp ? orderedNodes.slice(1) : orderedNodes;
+  for (const nodeIp of fallbackNodes) {
+    const result = await tryNode(nodeIp, headers, appName, component, folder);
+
+    if (result.success && result.response) {
+      return result.response;
+    }
+
+    lastError = result.error || 'Unknown error';
   }
 
   // All nodes failed
