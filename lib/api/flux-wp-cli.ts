@@ -30,6 +30,24 @@ export interface WPUser {
   roles: string;
 }
 
+export interface WPMedia {
+  ID: string;
+  post_title: string;
+  post_name: string;
+  post_mime_type: string;
+  post_date: string;
+  guid: string;
+}
+
+export interface MediaImportOptions {
+  title?: string;
+  alt?: string;
+  caption?: string;
+  description?: string;
+  postId?: number; // Attach to a specific post
+  featuredImage?: boolean; // Set as featured image for the postId
+}
+
 export interface WPCliExecParams {
   appName: string;
   nodeIp: string;
@@ -82,7 +100,7 @@ function parseSocketOutput(output: string): string {
   // Filter out:
   // - Lines starting with # (shell prompts)
   // - Empty lines at start/end
-  const contentLines = lines.filter((line, index) => {
+  const contentLines = lines.filter((line) => {
     const trimmed = line.trim();
     // Skip command echo line (starts with #)
     if (trimmed.startsWith('#')) return false;
@@ -587,4 +605,146 @@ export async function hasConfig(
     status: 'success',
     data: result.status === 'success',
   };
+}
+
+// ============ Media Functions ============
+
+/**
+ * Build media import options array from MediaImportOptions
+ */
+function buildMediaImportOptions(options: MediaImportOptions = {}): string[] {
+  const cmdOptions: string[] = [];
+
+  if (options.title) {
+    const escapedTitle = options.title.replace(/'/g, "'\\''");
+    cmdOptions.push(`--title='${escapedTitle}'`);
+  }
+
+  if (options.alt) {
+    const escapedAlt = options.alt.replace(/'/g, "'\\''");
+    cmdOptions.push(`--alt='${escapedAlt}'`);
+  }
+
+  if (options.caption) {
+    const escapedCaption = options.caption.replace(/'/g, "'\\''");
+    cmdOptions.push(`--caption='${escapedCaption}'`);
+  }
+
+  if (options.description) {
+    const escapedDesc = options.description.replace(/'/g, "'\\''");
+    cmdOptions.push(`--desc='${escapedDesc}'`);
+  }
+
+  if (options.postId) {
+    cmdOptions.push(`--post_id=${options.postId}`);
+  }
+
+  if (options.featuredImage && options.postId) {
+    cmdOptions.push('--featured_image');
+  }
+
+  return cmdOptions;
+}
+
+/**
+ * Import media from a local file path within the WordPress container
+ * The file must exist in the container (e.g., uploaded via flux-files API first)
+ *
+ * @param filePath - Path to the file inside the container (e.g., /var/www/html/wp-content/uploads/temp/image.jpg)
+ * @param options - Optional metadata (title, alt, caption, etc.)
+ * @returns Attachment ID on success
+ */
+export async function importMedia(
+  zelidauth: string,
+  params: WPCliExecParams,
+  filePath: string,
+  options: MediaImportOptions = {},
+  skipCopy: boolean = false
+): Promise<WPCliResponse<string>> {
+  const cmdOptions = buildMediaImportOptions(options);
+  cmdOptions.push('--porcelain'); // Return just the attachment ID
+
+  // If file is already in uploads directory, use --skip-copy to avoid re-copying
+  // This also bypasses some of the MIME type validation
+  if (skipCopy) {
+    cmdOptions.push('--skip-copy');
+  }
+
+  const cmd = buildWpCommand('media import', [`'${filePath}'`, ...cmdOptions]);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Import media from an external URL
+ * WordPress will download the file and add it to the media library
+ *
+ * @param url - Public URL of the media file to import
+ * @param options - Optional metadata (title, alt, caption, etc.)
+ * @returns Attachment ID on success
+ */
+export async function importMediaFromUrl(
+  zelidauth: string,
+  params: WPCliExecParams,
+  url: string,
+  options: MediaImportOptions = {}
+): Promise<WPCliResponse<string>> {
+  const cmdOptions = buildMediaImportOptions(options);
+  cmdOptions.push('--porcelain'); // Return just the attachment ID
+
+  // URL doesn't need escaping the same way, but we should validate it
+  const cmd = buildWpCommand('media import', [`'${url}'`, ...cmdOptions]);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * List all media items in the WordPress media library
+ */
+export async function listMedia(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<WPMedia[]>> {
+  const cmd = buildWpJsonCommand('post list', ['--post_type=attachment', '--fields=ID,post_title,post_name,post_mime_type,post_date,guid']);
+  return executeWpCommand<WPMedia[]>(zelidauth, params, cmd);
+}
+
+/**
+ * Get a single media item by attachment ID
+ */
+export async function getMedia(
+  zelidauth: string,
+  params: WPCliExecParams,
+  attachmentId: string
+): Promise<WPCliResponse<WPMedia>> {
+  const cmd = buildWpJsonCommand('post get', [attachmentId, '--fields=ID,post_title,post_name,post_mime_type,post_date,guid']);
+  return executeWpCommand<WPMedia>(zelidauth, params, cmd);
+}
+
+/**
+ * Delete a media item from the WordPress media library
+ * This also deletes the physical file from the uploads directory
+ *
+ * @param attachmentId - The attachment post ID to delete
+ */
+export async function deleteMedia(
+  zelidauth: string,
+  params: WPCliExecParams,
+  attachmentId: string
+): Promise<WPCliResponse<string>> {
+  const cmd = buildWpCommand('post delete', [attachmentId, '--force']);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Regenerate thumbnails for all images or a specific attachment
+ *
+ * @param attachmentId - Optional specific attachment ID, or regenerate all if not provided
+ */
+export async function regenerateThumbnails(
+  zelidauth: string,
+  params: WPCliExecParams,
+  attachmentId?: string
+): Promise<WPCliResponse<string>> {
+  const options = attachmentId ? [attachmentId] : ['--yes'];
+  const cmd = buildWpCommand('media regenerate', options);
+  return executeWpCommand<string>(zelidauth, params, cmd);
 }

@@ -164,6 +164,11 @@ function executeViaSocket(
 
           // Smart completion detection
           const checkCompletion = (): boolean => {
+            // Check for explicit completion marker (fastest detection)
+            if (output.includes('FLUXDONE')) {
+              return true;
+            }
+
             // Check for JSON completion
             if (isJsonCommand) {
               const jsonMatch = output.match(/\[[\s\S]*\]|\{[\s\S]*\}/);

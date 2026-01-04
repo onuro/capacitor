@@ -5,12 +5,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/auth';
 import { useNodeSelection } from '@/hooks/use-node-selection';
 import { useResolvedNode } from '@/components/apps/node-picker';
-import { Loader2, AlertCircle, Plug, Palette, Users, FileWarning, Wrench } from 'lucide-react';
+import { Loader2, AlertCircle, Plug, Palette, Users, FileWarning, Wrench, Image } from 'lucide-react';
 import { PluginManager } from './plugin-manager';
 import { ThemeManager } from './theme-manager';
 import { UserManager } from './user-manager';
 import { ErrorLogsViewer } from './error-logs';
 import { MaintenanceManager } from './maintenance-manager';
+import { MediaManager } from './media-manager';
 
 interface WPCliDashboardProps {
   appName: string;
@@ -93,6 +94,10 @@ export function WPCliDashboard({ appName, selectedNode }: WPCliDashboardProps) {
               <Palette className="size-4" />
               Themes
             </TabsTrigger>
+            <TabsTrigger value="media" className="flex items-center gap-2">
+              <Image className="size-4" />
+              Media
+            </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="size-4" />
               Users
@@ -113,6 +118,10 @@ export function WPCliDashboard({ appName, selectedNode }: WPCliDashboardProps) {
 
           <TabsContent value="themes">
             <ThemeManager appName={appName} nodeIp={resolvedNode} />
+          </TabsContent>
+
+          <TabsContent value="media">
+            <MediaManager appName={appName} nodeIp={resolvedNode} />
           </TabsContent>
 
           <TabsContent value="users">
