@@ -10,8 +10,8 @@ export default function AppsPage() {
     <main className="container p-6">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <Box className="size-8" />
+          <h1 className="text-xl font-semibold flex items-center uppercase gap-3">
+            <Box className="size-5" />
             My Apps
           </h1>
           <p className="text-muted-foreground mt-1">

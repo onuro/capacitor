@@ -5,11 +5,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuthStore } from '@/stores/auth';
 import { useNodeSelection } from '@/hooks/use-node-selection';
 import { useResolvedNode } from '@/components/apps/node-picker';
-import { Loader2, AlertCircle, Plug, Palette, Users, FileWarning } from 'lucide-react';
+import { Loader2, AlertCircle, Plug, Palette, Users, FileWarning, Wrench } from 'lucide-react';
 import { PluginManager } from './plugin-manager';
 import { ThemeManager } from './theme-manager';
 import { UserManager } from './user-manager';
 import { ErrorLogsViewer } from './error-logs';
+import { MaintenanceManager } from './maintenance-manager';
 
 interface WPCliDashboardProps {
   appName: string;
@@ -100,6 +101,10 @@ export function WPCliDashboard({ appName, selectedNode }: WPCliDashboardProps) {
               <FileWarning className="size-4" />
               Error Logs
             </TabsTrigger>
+            <TabsTrigger value="maintenance" className="flex items-center gap-2">
+              <Wrench className="size-4" />
+              Maintenance
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="plugins">
@@ -116,6 +121,10 @@ export function WPCliDashboard({ appName, selectedNode }: WPCliDashboardProps) {
 
           <TabsContent value="logs">
             <ErrorLogsViewer appName={appName} nodeIp={resolvedNode} />
+          </TabsContent>
+
+          <TabsContent value="maintenance">
+            <MaintenanceManager appName={appName} nodeIp={resolvedNode} />
           </TabsContent>
         </Tabs>
       )}

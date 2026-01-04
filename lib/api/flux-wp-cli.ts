@@ -357,3 +357,234 @@ export async function getLogFileInfo(
   const cmd = `if [ -f ${logPath} ]; then stat -c '{"exists":true,"size":"%s","modified":"%y"}' ${logPath} 2>/dev/null || stat -f '{"exists":true,"size":"%z","modified":"%m"}' ${logPath} 2>/dev/null; else echo '{"exists":false,"size":"0","modified":""}'; fi`;
   return executeWpCommand<{ exists: boolean; size: string; modified: string }>(zelidauth, params, cmd);
 }
+
+// ============ Core Maintenance Functions ============
+
+export interface CoreReinstallParams {
+  siteUrl: string;
+  siteTitle: string;
+  adminUser: string;
+  adminPassword: string;
+  adminEmail: string;
+}
+
+/**
+ * Export database backup before destructive operations
+ * Best practice: Always backup before risky operations
+ */
+export async function exportDatabase(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<string>> {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupPath = `/var/www/html/wp-content/backup-${timestamp}.sql`;
+  const cmd = buildWpCommand('db export', [backupPath]);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Reset database - clears all WordPress data
+ * WARNING: This is a destructive operation
+ */
+export async function resetDatabase(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<string>> {
+  const cmd = buildWpCommand('db reset', ['--yes']);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Download fresh WordPress core files
+ * Uses --force to overwrite existing files
+ */
+export async function downloadCore(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<string>> {
+  const cmd = buildWpCommand('core download', ['--force']);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Install WordPress with provided configuration
+ * Must be run after resetDatabase and downloadCore
+ */
+export async function installCore(
+  zelidauth: string,
+  params: WPCliExecParams,
+  installParams: CoreReinstallParams
+): Promise<WPCliResponse<string>> {
+  const escapedTitle = installParams.siteTitle.replace(/'/g, "'\\''");
+  const escapedUser = installParams.adminUser.replace(/'/g, "'\\''");
+  const escapedPassword = installParams.adminPassword.replace(/'/g, "'\\''");
+  const escapedEmail = installParams.adminEmail.replace(/'/g, "'\\''");
+
+  const options = [
+    `--url='${installParams.siteUrl}'`,
+    `--title='${escapedTitle}'`,
+    `--admin_user='${escapedUser}'`,
+    `--admin_password='${escapedPassword}'`,
+    `--admin_email='${escapedEmail}'`,
+  ];
+  const cmd = buildWpCommand('core install', options);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Get WordPress core information including version and update status
+ */
+export async function getCoreInfo(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<{ version: string; updateAvailable: boolean; latestVersion?: string }>> {
+  const versionCmd = buildWpCommand('core version');
+  const versionResult = await executeWpCommand<string>(zelidauth, params, versionCmd);
+
+  if (versionResult.status === 'error') {
+    return { status: 'error', message: versionResult.message };
+  }
+
+  // Check for updates
+  const checkCmd = buildWpCommand('core check-update', ['--format=json']);
+  const updateResult = await executeWpCommand<Array<{ version: string }>>(zelidauth, params, checkCmd);
+
+  const version = typeof versionResult.data === 'string' ? versionResult.data.trim() : '';
+  const updates = Array.isArray(updateResult.data) ? updateResult.data : [];
+
+  return {
+    status: 'success',
+    data: {
+      version,
+      updateAvailable: updates.length > 0,
+      latestVersion: updates.length > 0 ? updates[0].version : undefined,
+    },
+  };
+}
+
+/**
+ * Update WordPress core to the latest version
+ */
+export async function updateCore(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<string>> {
+  const cmd = buildWpCommand('core update');
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Verify WordPress core file integrity
+ */
+export async function verifyCoreChecksums(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<string>> {
+  const cmd = buildWpCommand('core verify-checksums');
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Flush all caches (object cache and rewrite rules)
+ */
+export async function flushAllCaches(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<string>> {
+  const cmd = `cd /var/www/html && wp cache flush --allow-root && wp rewrite flush --allow-root`;
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+// ============ Config Functions ============
+
+export interface WPConfigItem {
+  name: string;
+  value: string;
+  type: 'constant' | 'variable';
+}
+
+export interface SetConfigOptions {
+  type?: 'constant' | 'variable';
+  raw?: boolean; // For non-string values (true, false, numbers)
+}
+
+/**
+ * List all wp-config.php constants and variables
+ */
+export async function listConfig(
+  zelidauth: string,
+  params: WPCliExecParams
+): Promise<WPCliResponse<WPConfigItem[]>> {
+  const cmd = buildWpJsonCommand('config list');
+  return executeWpCommand<WPConfigItem[]>(zelidauth, params, cmd);
+}
+
+/**
+ * Get a specific config value
+ */
+export async function getConfig(
+  zelidauth: string,
+  params: WPCliExecParams,
+  name: string
+): Promise<WPCliResponse<string>> {
+  const cmd = buildWpCommand('config get', [name]);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Set or add a config constant/variable
+ */
+export async function setConfig(
+  zelidauth: string,
+  params: WPCliExecParams,
+  name: string,
+  value: string,
+  options: SetConfigOptions = {}
+): Promise<WPCliResponse<string>> {
+  const escapedValue = value.replace(/'/g, "'\\''");
+  const cmdOptions: string[] = [name];
+
+  // For raw values (true, false, numbers), don't quote the value
+  if (options.raw) {
+    cmdOptions.push(value);
+    cmdOptions.push('--raw');
+  } else {
+    cmdOptions.push(`'${escapedValue}'`);
+  }
+
+  if (options.type) {
+    cmdOptions.push(`--type=${options.type}`);
+  }
+
+  const cmd = buildWpCommand('config set', cmdOptions);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Delete a config constant/variable
+ */
+export async function deleteConfig(
+  zelidauth: string,
+  params: WPCliExecParams,
+  name: string
+): Promise<WPCliResponse<string>> {
+  const cmd = buildWpCommand('config delete', [name]);
+  return executeWpCommand<string>(zelidauth, params, cmd);
+}
+
+/**
+ * Check if a config constant/variable exists
+ */
+export async function hasConfig(
+  zelidauth: string,
+  params: WPCliExecParams,
+  name: string
+): Promise<WPCliResponse<boolean>> {
+  const cmd = buildWpCommand('config has', [name]);
+  const result = await executeWpCommand<string>(zelidauth, params, cmd);
+  // wp config has returns exit code 0 if exists, 1 if not
+  return {
+    status: 'success',
+    data: result.status === 'success',
+  };
+}

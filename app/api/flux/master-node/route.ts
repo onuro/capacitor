@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getMasterFromFdm, toFluxApiPort } from '@/lib/flux-fdm';
 import { detectMasterNode } from '@/lib/flux-haproxy';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
- * Get the master node IP for a Flux app by checking HAProxy statistics.
- * The master is the server with act=1 (active), backups have bck=1.
- * This returns the correct Flux API port (not app port).
+ * Get the master node IP for a Flux app.
+ * Primary: FDM (Flux Domain Manager) - works for ALL apps
+ * Fallback: HAProxy statistics - only works for apps with domains
  */
 export async function GET(request: NextRequest) {
   const appName = request.nextUrl.searchParams.get('appName');
@@ -22,24 +23,46 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`[master-node] Detecting master for ${appName}...`);
 
-    const masterIp = await detectMasterNode(appName, 10000);
+    // Primary: Try FDM first (works for ALL apps)
+    const fdmResult = await getMasterFromFdm(appName, 8000);
 
-    if (masterIp) {
-      console.log(`[master-node] Found master for ${appName}: ${masterIp}`);
+    if (fdmResult.masterIp) {
+      // Convert app port to Flux API port
+      const masterApiPort = toFluxApiPort(fdmResult.masterIp);
+      console.log(`[master-node] Found master via FDM for ${appName}: ${masterApiPort}`);
       return NextResponse.json({
         status: 'success',
         data: {
-          masterIp,
+          masterIp: masterApiPort,
+          allIps: fdmResult.allIps.map(toFluxApiPort),
+          appName,
+          region: fdmResult.region,
+          source: 'fdm',
+        },
+      });
+    }
+
+    // Fallback: Try HAProxy (only works for apps with domains)
+    console.log(`[master-node] FDM failed, trying HAProxy for ${appName}...`);
+    const haproxyMaster = await detectMasterNode(appName, 8000);
+
+    if (haproxyMaster) {
+      console.log(`[master-node] Found master via HAProxy for ${appName}: ${haproxyMaster}`);
+      return NextResponse.json({
+        status: 'success',
+        data: {
+          masterIp: haproxyMaster,
+          allIps: [haproxyMaster],
           appName,
           source: 'haproxy',
         },
       });
     }
 
-    console.log(`[master-node] No active server found for ${appName}`);
+    console.log(`[master-node] No master found for ${appName}`);
     return NextResponse.json({
       status: 'error',
-      message: 'No active master node found in HAProxy stats',
+      message: 'Could not detect master node from FDM or HAProxy',
     });
   } catch (error) {
     console.error(`[master-node] Error:`, error);

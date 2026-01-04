@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getMasterFromFdm, toFluxApiPort } from '@/lib/flux-fdm';
 
 // Disable caching for this API route
 export const dynamic = 'force-dynamic';
@@ -170,6 +171,30 @@ export async function GET(request: NextRequest) {
 
   console.log('=== Stats Debug ===', new Date().toISOString());
   console.log('Node IPs received:', ips);
+
+  // Detect master node via FDM and prioritize it
+  const fdmResult = await getMasterFromFdm(appName, 5000);
+  if (fdmResult.masterIp) {
+    const masterApiPort = toFluxApiPort(fdmResult.masterIp);
+    console.log(`[Stats] Master detected via FDM: ${masterApiPort}`);
+
+    // Check if master is already in the list
+    const masterIndex = ips.findIndex(ip => ip.includes(masterApiPort.split(':')[0]));
+    if (masterIndex > 0) {
+      // Move master to front
+      ips.splice(masterIndex, 1);
+      ips.unshift(masterApiPort);
+      console.log('[Stats] Moved master to front of list');
+    } else if (masterIndex === -1) {
+      // Master not in client list, add it first
+      ips.unshift(masterApiPort);
+      console.log('[Stats] Added master to front of list');
+    }
+  } else {
+    console.log('[Stats] FDM detection failed, using client-provided order');
+  }
+
+  console.log('Node IPs after master detection:', ips);
   console.log('Container names to try:', containerNames);
   console.log('Starting node iteration...');
 
