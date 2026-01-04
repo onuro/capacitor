@@ -42,6 +42,7 @@ import {
   Plus,
   Pencil,
   Search,
+  Eye,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth';
 import { toast } from 'sonner';
@@ -94,6 +95,7 @@ export function MaintenanceManager({ appName, nodeIp }: BaseWpCliProps) {
   const [configSearch, setConfigSearch] = useState('');
   const [addConfigDialogOpen, setAddConfigDialogOpen] = useState(false);
   const [editConfigDialog, setEditConfigDialog] = useState<WPConfigItem | null>(null);
+  const [editConfigValue, setEditConfigValue] = useState('');
   const [deleteConfigDialog, setDeleteConfigDialog] = useState<WPConfigItem | null>(null);
   const [newConfig, setNewConfig] = useState<{ name: string; value: string; type: 'constant' | 'variable'; raw: boolean }>({ name: '', value: '', type: 'constant', raw: false });
 
@@ -217,6 +219,40 @@ export function MaintenanceManager({ appName, nodeIp }: BaseWpCliProps) {
     if (typeof value === 'number') return String(value);
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value);
+  };
+
+  // Format value for editing (pretty-print JSON)
+  const formatValueForEdit = (value: unknown): string => {
+    const str = valueToString(value);
+    try {
+      const parsed = JSON.parse(str);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return JSON.stringify(parsed, null, 2);
+      }
+    } catch {
+      // Not valid JSON, return as-is
+    }
+    return str;
+  };
+
+  // Check if value is an array/object (not editable via WP-CLI)
+  const isComplexValue = (value: unknown): boolean => {
+    if (typeof value === 'object' && value !== null) return true;
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === 'object' && parsed !== null;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  };
+
+  // Open edit dialog with formatted value
+  const openEditDialog = (item: WPConfigItem) => {
+    setEditConfigDialog(item);
+    setEditConfigValue(formatValueForEdit(item.value));
   };
 
   // Filter config items
@@ -465,47 +501,68 @@ export function MaintenanceManager({ appName, nodeIp }: BaseWpCliProps) {
                       {configSearch ? 'No matching constants found' : 'No constants found'}
                     </p>
                   ) : (
-                    filteredConfig.map((item) => (
-                      <div
-                        key={item.name}
-                        className="flex items-center justify-between p-3 rounded-lg border"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="font-mono text-sm font-medium">{item.name}</p>
-                            <Badge variant="outline" className="text-xs">
-                              {item.type}
-                            </Badge>
+                    filteredConfig.map((item) => {
+                      const isComplex = isComplexValue(item.value);
+                      return (
+                        <div
+                          key={item.name}
+                          className="flex items-center justify-between p-3 rounded-lg border"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-mono text-sm font-medium">{item.name}</p>
+                              <Badge variant="outline" className="text-xs">
+                                {item.type}
+                              </Badge>
+                              {isComplex && (
+                                <Badge variant="secondary" className="text-xs">
+                                  array
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 truncate font-mono">
+                              {(() => {
+                                const val = valueToString(item.value);
+                                return val.length > 50 ? `${val.slice(0, 50)}...` : val;
+                              })()}
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1 truncate font-mono">
-                            {(() => {
-                              const val = valueToString(item.value);
-                              return val.length > 50 ? `${val.slice(0, 50)}...` : val;
-                            })()}
-                          </p>
+                          <div className="flex gap-1 ml-2">
+                            {isComplex ? (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(item)}
+                                title="View (read-only)"
+                              >
+                                <Eye className="size-4 text-muted-foreground" />
+                              </Button>
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openEditDialog(item)}
+                                  disabled={setConfigMutation.isPending || deleteConfigMutation.isPending}
+                                  title="Edit"
+                                >
+                                  <Pencil className="size-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setDeleteConfigDialog(item)}
+                                  disabled={setConfigMutation.isPending || deleteConfigMutation.isPending}
+                                  title="Delete"
+                                >
+                                  <Trash2 className="size-4 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-1 ml-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setEditConfigDialog(item)}
-                            disabled={setConfigMutation.isPending || deleteConfigMutation.isPending}
-                            title="Edit"
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setDeleteConfigDialog(item)}
-                            disabled={setConfigMutation.isPending || deleteConfigMutation.isPending}
-                            title="Delete"
-                          >
-                            <Trash2 className="size-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
@@ -589,62 +646,85 @@ export function MaintenanceManager({ appName, nodeIp }: BaseWpCliProps) {
 
       {/* Edit Config Dialog */}
       <Dialog open={!!editConfigDialog} onOpenChange={() => setEditConfigDialog(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Configuration</DialogTitle>
-            <DialogDescription>
-              Update the value for <span className="font-mono">{editConfigDialog?.name}</span>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="editConfigValue">Value</Label>
-              <Input
-                id="editConfigValue"
-                value={valueToString(editConfigDialog?.value)}
-                onChange={(e) => editConfigDialog && setEditConfigDialog({ ...editConfigDialog, value: e.target.value })}
-                className="font-mono"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={(() => {
-                  const val = valueToString(editConfigDialog?.value);
-                  return val === 'true' || val === 'false' || !isNaN(Number(val));
-                })()}
-                onCheckedChange={() => {
-                  // This is informational - we'll determine raw based on value content
-                }}
-                disabled
-              />
-              <span className="text-sm text-muted-foreground">
-                Raw value will be auto-detected
-              </span>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditConfigDialog(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (editConfigDialog) {
-                  const val = valueToString(editConfigDialog.value);
-                  const isRaw = val === 'true' || val === 'false' || !isNaN(Number(val));
-                  setConfigMutation.mutate({
-                    name: editConfigDialog.name,
-                    value: val,
-                    type: editConfigDialog.type,
-                    raw: isRaw,
-                  });
-                }
-              }}
-              disabled={setConfigMutation.isPending}
-            >
-              {setConfigMutation.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
-              Save
-            </Button>
-          </DialogFooter>
+        <DialogContent className="max-w-2xl">
+          {(() => {
+            const isComplex = editConfigDialog ? isComplexValue(editConfigDialog.value) : false;
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle>{isComplex ? 'View Configuration' : 'Edit Configuration'}</DialogTitle>
+                  <DialogDescription>
+                    {isComplex ? (
+                      <>View value for <span className="font-mono">{editConfigDialog?.name}</span> (read-only, edit in File Browser)</>
+                    ) : (
+                      <>Update the value for <span className="font-mono">{editConfigDialog?.name}</span></>
+                    )}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="editConfigValue">Value</Label>
+                    <Textarea
+                      id="editConfigValue"
+                      value={editConfigValue}
+                      onChange={(e) => setEditConfigValue(e.target.value)}
+                      className="font-mono min-h-[200px] text-sm"
+                      placeholder="Enter value..."
+                      readOnly={isComplex}
+                    />
+                  </div>
+                  {!isComplex && (
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={(() => {
+                          const val = editConfigValue.trim();
+                          return val === 'true' || val === 'false' || (!isNaN(Number(val)) && val !== '');
+                        })()}
+                        onCheckedChange={() => {}}
+                        disabled
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        Raw value will be auto-detected (for true, false, numbers)
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEditConfigDialog(null)}>
+                    {isComplex ? 'Close' : 'Cancel'}
+                  </Button>
+                  {!isComplex && (
+                    <Button
+                      onClick={() => {
+                        if (editConfigDialog) {
+                          let finalValue = editConfigValue.trim();
+                          try {
+                            const parsed = JSON.parse(finalValue);
+                            if (typeof parsed === 'object' && parsed !== null) {
+                              finalValue = JSON.stringify(parsed);
+                            }
+                          } catch {
+                            // Not JSON, use as-is
+                          }
+                          const isRaw = finalValue === 'true' || finalValue === 'false' || (!isNaN(Number(finalValue)) && finalValue !== '');
+                          setConfigMutation.mutate({
+                            name: editConfigDialog.name,
+                            value: finalValue,
+                            type: editConfigDialog.type,
+                            raw: isRaw,
+                          });
+                        }
+                      }}
+                      disabled={setConfigMutation.isPending}
+                    >
+                      {setConfigMutation.isPending && <Loader2 className="size-4 mr-2 animate-spin" />}
+                      Save
+                    </Button>
+                  )}
+                </DialogFooter>
+              </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
