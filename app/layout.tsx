@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { Figtree } from 'next/font/google';
 import './globals.css';
 import { AppSidebar } from '@/components/layout/app-sidebar';
 import { AppHeader } from '@/components/layout/app-header';
@@ -9,10 +9,11 @@ import { WalletProvider } from '@/components/wallet/providers';
 import { ThemeProvider } from '@/components/theme/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 
-const inter = Inter({
-  variable: '--font-inter',
+const figtree = Figtree({
+  variable: '--font-figtree',
   subsets: ['latin'],
 });
+
 
 export const metadata: Metadata = {
   title: 'Capacitor - Deploy Apps on FluxCloud',
@@ -34,7 +35,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${figtree.variable} font-sans antialiased`}>
         <ThemeProvider>
           <WalletProvider>
             <SidebarProvider>

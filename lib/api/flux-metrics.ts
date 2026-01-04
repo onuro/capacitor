@@ -22,6 +22,11 @@ export interface ContainerStats {
     read_bytes: number;
     write_bytes: number;
   };
+  disk: {
+    usage: number;
+    limit: number;
+    percent: number;
+  };
 }
 
 export interface AppStats {

@@ -25,6 +25,12 @@ interface DockerStats {
   blkio_stats?: {
     io_service_bytes_recursive?: Array<{ op: string; value: number }>;
   };
+  disk_stats?: {
+    bind?: number;
+    volume?: number;
+    rootfs?: number;
+    status?: string;
+  };
 }
 
 function calculateCpuPercent(stats: DockerStats): number {
@@ -38,7 +44,7 @@ function calculateCpuPercent(stats: DockerStats): number {
   return 0;
 }
 
-function transformDockerStats(rawStats: DockerStats, containerName: string) {
+function transformDockerStats(rawStats: DockerStats, containerName: string, hddLimitGB?: number) {
   // Calculate network totals
   let rxBytes = 0;
   let txBytes = 0;
@@ -62,6 +68,12 @@ function transformDockerStats(rawStats: DockerStats, containerName: string) {
   const memoryUsage = rawStats.memory_stats?.usage || 0;
   const memoryLimit = rawStats.memory_stats?.limit || 0;
 
+  // Calculate disk usage (bind mounts are the primary persistent storage)
+  const diskUsage = rawStats.disk_stats?.status !== 'error'
+    ? (rawStats.disk_stats?.bind || 0) + (rawStats.disk_stats?.volume || 0)
+    : 0;
+  const diskLimit = hddLimitGB ? hddLimitGB * 1024 * 1024 * 1024 : 0; // Convert GB to bytes
+
   return {
     name: containerName,
     cpu: calculateCpuPercent(rawStats),
@@ -77,6 +89,11 @@ function transformDockerStats(rawStats: DockerStats, containerName: string) {
     block: {
       read_bytes: readBytes,
       write_bytes: writeBytes,
+    },
+    disk: {
+      usage: diskUsage,
+      limit: diskLimit,
+      percent: diskLimit > 0 ? (diskUsage / diskLimit) * 100 : 0,
     },
   };
 }
@@ -96,16 +113,25 @@ export async function GET(request: NextRequest) {
 
   const ips = nodeIps.split(',').filter(Boolean);
 
-  // Get app specification to find component names
+  // Get app specification to find component names and HDD limits
   let componentNames: string[] = [];
+  const componentHddLimits: Record<string, number> = {};
+  let defaultHddLimit = 0;
   try {
     const specResponse = await fetch(
       `https://api.runonflux.io/apps/appspecifications/${appName}`,
       { signal: AbortSignal.timeout(10000) }
     );
     const specData = await specResponse.json();
-    if (specData.status === 'success' && specData.data?.compose) {
-      componentNames = specData.data.compose.map((c: { name: string }) => c.name);
+    if (specData.status === 'success' && specData.data) {
+      if (specData.data.compose) {
+        componentNames = specData.data.compose.map((c: { name: string; hdd: number }) => {
+          componentHddLimits[`${c.name}_${appName}`] = c.hdd || 0;
+          return c.name;
+        });
+      } else {
+        defaultHddLimit = specData.data.hdd || 0;
+      }
     }
   } catch (error) {
     console.error('Error fetching app spec:', error);
@@ -180,7 +206,8 @@ export async function GET(request: NextRequest) {
           console.log(`SUCCESS from ${nodeIp} - returning stats`);
           console.log('Raw data memory:', data.data.memory_stats?.usage, '/', data.data.memory_stats?.limit);
           // Transform raw Docker stats to our format
-          const transformedStats = transformDockerStats(data.data, containerName);
+          const hddLimit = componentHddLimits[containerName] || defaultHddLimit;
+          const transformedStats = transformDockerStats(data.data, containerName, hddLimit);
 
           return NextResponse.json({
             status: 'success',

@@ -18,7 +18,7 @@ import {
   Cpu,
   MemoryStick,
   HardDrive,
-  Network,
+  // Network,
   Server,
   RefreshCw,
   Loader2,
@@ -139,14 +139,20 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
     stats?.containers?.reduce((sum, c) => sum + c.memory.usage, 0) || 0;
   const totalMemoryLimit =
     stats?.containers?.reduce((sum, c) => sum + c.memory.limit, 0) || 0;
-  const totalNetworkRx =
-    stats?.containers?.reduce((sum, c) => sum + c.network.rx_bytes, 0) || 0;
-  const totalNetworkTx =
-    stats?.containers?.reduce((sum, c) => sum + c.network.tx_bytes, 0) || 0;
+  // Network stats (commented out for now)
+  // const totalNetworkRx =
+  //   stats?.containers?.reduce((sum, c) => sum + c.network.rx_bytes, 0) || 0;
+  // const totalNetworkTx =
+  //   stats?.containers?.reduce((sum, c) => sum + c.network.tx_bytes, 0) || 0;
+  const totalDiskUsage =
+    stats?.containers?.reduce((sum, c) => sum + (c.disk?.usage || 0), 0) || 0;
+  const totalDiskLimit =
+    stats?.containers?.reduce((sum, c) => sum + (c.disk?.limit || 0), 0) || 0;
 
   // Calculate percentages for bar charts
   const cpuPercent = Math.min(100, totalCpu);
   const memoryPercent = totalMemoryLimit > 0 ? (totalMemoryUsage / totalMemoryLimit) * 100 : 0;
+  const diskPercent = totalDiskLimit > 0 ? (totalDiskUsage / totalDiskLimit) * 100 : 0;
 
   if (isLoading) {
     return (
@@ -211,7 +217,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <MetricCard
             title="CPU Usage"
             value={formatCpu(totalCpu)}
@@ -226,7 +232,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
             icon={<MemoryStick className="size-5 text-primary" />}
             percentage={memoryPercent}
           />
-          <MetricCard
+          {/* <MetricCard
             title="Network In"
             value={formatBytes(totalNetworkRx)}
             subtitle="Total received"
@@ -237,6 +243,13 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
             value={formatBytes(totalNetworkTx)}
             subtitle="Total sent"
             icon={<HardDrive className="size-5 text-primary" />}
+          /> */}
+          <MetricCard
+            title="Disk Usage"
+            value={formatBytes(totalDiskUsage)}
+            subtitle={`of ${formatBytes(totalDiskLimit)}`}
+            icon={<HardDrive className="size-5 text-primary" />}
+            percentage={diskPercent}
           />
         </div>
       )}
