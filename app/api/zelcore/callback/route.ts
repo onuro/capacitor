@@ -12,7 +12,7 @@ declare global {
 }
 
 const signatureStore = global.zelcoreSignatures || new Map<string, SignatureData>();
-if (process.env.NODE_ENV !== 'production') global.zelcoreSignatures = signatureStore;
+global.zelcoreSignatures = signatureStore;
 
 export async function OPTIONS(req: NextRequest) {
   return new NextResponse(null, {

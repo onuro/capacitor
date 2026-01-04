@@ -15,7 +15,7 @@ declare global {
 }
 
 const signatureStore = global.zelcoreSignatures || new Map<string, SignatureData>();
-if (process.env.NODE_ENV !== 'production') global.zelcoreSignatures = signatureStore;
+global.zelcoreSignatures = signatureStore;
 
 // Sync with the callback route logic (re-implementing store access here as they might run in different contexts in some setups, 
 // but in standard Next.js Node server they share memory if global is used)
