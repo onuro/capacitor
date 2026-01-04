@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { UsageBarChart } from '@/components/ui/usage-bar-chart';
 import {
   getAppStatsFromNodes,
   formatBytes,
@@ -30,15 +31,35 @@ interface MetricsDashboardProps {
   selectedNode: string;
 }
 
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSeconds < 60) {
+    return 'just now';
+  } else if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+  } else if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+  } else {
+    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  }
+}
+
 interface MetricCardProps {
   title: string;
   value: string;
   subtitle?: string;
   icon: React.ReactNode;
-  trend?: 'up' | 'down' | 'stable';
+  /** Optional usage percentage for bar chart (0-100) */
+  percentage?: number;
 }
 
-function MetricCard({ title, value, subtitle, icon }: MetricCardProps) {
+function MetricCard({ title, value, subtitle, icon, percentage }: MetricCardProps) {
   return (
     <Card>
       <CardContent>
@@ -54,6 +75,11 @@ function MetricCard({ title, value, subtitle, icon }: MetricCardProps) {
             {icon}
           </div>
         </div>
+        {percentage !== undefined && (
+          <div className="mt-3">
+            <UsageBarChart value={percentage} height={31} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -117,6 +143,10 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
     stats?.containers?.reduce((sum, c) => sum + c.network.rx_bytes, 0) || 0;
   const totalNetworkTx =
     stats?.containers?.reduce((sum, c) => sum + c.network.tx_bytes, 0) || 0;
+
+  // Calculate percentages for bar charts
+  const cpuPercent = Math.min(100, totalCpu);
+  const memoryPercent = totalMemoryLimit > 0 ? (totalMemoryUsage / totalMemoryLimit) * 100 : 0;
 
   if (isLoading) {
     return (
@@ -187,12 +217,14 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
             value={formatCpu(totalCpu)}
             subtitle="Total across containers"
             icon={<Cpu className="size-5 text-primary" />}
+            percentage={cpuPercent}
           />
           <MetricCard
             title="Memory"
             value={formatBytes(totalMemoryUsage)}
             subtitle={`of ${formatBytes(totalMemoryLimit)}`}
             icon={<MemoryStick className="size-5 text-primary" />}
+            percentage={memoryPercent}
           />
           <MetricCard
             title="Network In"
@@ -231,7 +263,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
                 return (
                   <div
                     key={idx}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${isHighlighted ? 'bg-primary/10 border-primary/30' : 'bg-muted/30'
+                    className={`flex items-center justify-between p-3 rounded-lg ${isHighlighted ? 'bg-primary/10' : 'bg-muted/30'
                       }`}
                   >
                     <div className="flex items-center gap-3">
@@ -239,7 +271,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
                       <div>
                         <p className="font-medium text-sm">{location.ip}</p>
                         <p className="text-xs text-muted-foreground">
-                          Registered: {new Date(location.broadcastedAt).toLocaleString()}
+                          Registered: {formatRelativeTime(new Date(location.broadcastedAt))}
                         </p>
                       </div>
                     </div>

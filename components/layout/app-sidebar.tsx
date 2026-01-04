@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutGrid, Rocket, ExternalLink, Zap } from 'lucide-react';
+import { Home, LayoutGrid, ExternalLink, Zap } from 'lucide-react';
 
 import {
   Sidebar,
@@ -27,11 +27,6 @@ const navItems = [
     title: 'My Apps',
     url: '/apps',
     icon: LayoutGrid,
-  },
-  {
-    title: 'Deploy App',
-    url: '/register',
-    icon: Rocket,
   },
 ];
 
