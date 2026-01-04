@@ -81,7 +81,7 @@ export function AppList() {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
       {apps.map((app: FluxApp) => (
         <AppCard key={app.name} app={app} />
       ))}

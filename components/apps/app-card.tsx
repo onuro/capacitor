@@ -73,7 +73,7 @@ export function AppCard({ app }: AppCardProps) {
               )}
             </div>
             <div>
-              <CardTitle className="text-lg">{app.name}</CardTitle>
+              <CardTitle className="text-lg">{app.description}</CardTitle>
               <CardDescription className="text-sm">
                 {domain ? (
                   <a
@@ -121,12 +121,12 @@ export function AppCard({ app }: AppCardProps) {
         </div>
 
         <div className="flex gap-2 pt-2">
-          <Button asChild variant="outline" size="sm" className="flex-1">
+          <Button asChild className="flex-1">
             <Link href={`/apps/${app.name}`}>
               Manage
             </Link>
           </Button>
-          <Button variant="ghost" size="icon-sm" asChild>
+          {/* <Button variant="ghost" size="icon-sm" asChild>
             <a
               href={`https://home.runonflux.io/apps/globalapps/${app.name}`}
               target="_blank"
@@ -134,7 +134,7 @@ export function AppCard({ app }: AppCardProps) {
             >
               <ExternalLink className="size-4" />
             </a>
-          </Button>
+          </Button> */}
         </div>
       </CardContent>
     </Card>

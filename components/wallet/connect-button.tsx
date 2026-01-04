@@ -157,13 +157,13 @@ export function ConnectButton() {
       <DialogTrigger asChild>
         <Button className="gap-2">
           <Wallet className="size-4" />
-          Connect Wallet
+          Login with Wallet
           <ChevronDown className="size-4" />
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Connect Your Wallet</DialogTitle>
+          <DialogTitle>Login with Wallet</DialogTitle>
           <DialogDescription>
             Choose a wallet to connect and sign in to Capacitor
           </DialogDescription>

@@ -62,7 +62,7 @@ export default function AppDetailPage({ params }: PageProps) {
   // Not authenticated - show connect prompt
   if (!isAuthenticated) {
     return (
-      <main className="container py-8">
+      <main className="container p-6">
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <Box className="size-12 text-muted-foreground mb-4" />
           <h3 className="text-lg font-semibold mb-2">Connect Your Wallet</h3>
@@ -77,7 +77,7 @@ export default function AppDetailPage({ params }: PageProps) {
 
   if (specLoading) {
     return (
-      <main className="container py-8">
+      <main className="container p-6">
         <div className="flex items-center justify-center py-16">
           <Loader2 className="size-8 animate-spin text-primary" />
         </div>
@@ -87,7 +87,7 @@ export default function AppDetailPage({ params }: PageProps) {
 
   if (specError || !app) {
     return (
-      <main className="container py-8">
+      <main className="container p-6">
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <AlertCircle className="size-12 text-destructive mb-4" />
           <h2 className="text-xl font-semibold mb-2">App Not Found</h2>
@@ -119,7 +119,7 @@ export default function AppDetailPage({ params }: PageProps) {
     : app.name;
 
   return (
-    <main className="container py-8">
+    <main className="container p-6">
       <div className="mb-6">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-center gap-5">

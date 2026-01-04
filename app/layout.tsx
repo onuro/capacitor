@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Header } from '@/components/layout/header';
+import { AppSidebar } from '@/components/layout/app-sidebar';
+import { AppHeader } from '@/components/layout/app-header';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Footer } from '@/components/layout/footer';
 import { WalletProvider } from '@/components/wallet/providers';
 import { ThemeProvider } from '@/components/theme/theme-provider';
@@ -35,11 +37,14 @@ export default function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <ThemeProvider>
           <WalletProvider>
-            <div className="relative flex min-h-screen flex-col">
-              <Header />
-              <main className="flex-1 flex flex-col min-h-full bg-muted">{children}</main>
-              <Footer />
-            </div>
+            <SidebarProvider>
+              <AppSidebar />
+              <SidebarInset>
+                <AppHeader />
+                <main className="flex-1 flex flex-col min-h-full bg-muted">{children}</main>
+                <Footer />
+              </SidebarInset>
+            </SidebarProvider>
             <Toaster />
           </WalletProvider>
         </ThemeProvider>
