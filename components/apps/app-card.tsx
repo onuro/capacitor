@@ -92,7 +92,7 @@ export function AppCard({ app }: AppCardProps) {
             </div>
           </div>
           <Badge variant="outline" className="text-xs">
-            {app.instances} instances
+            {app.instances}
           </Badge>
         </div>
       </CardHeader>
@@ -104,7 +104,7 @@ export function AppCard({ app }: AppCardProps) {
           </div>
           <div className="flex items-center gap-1.5">
             <MemoryStick className="size-4" />
-            <span>{totalRam} MB RAM</span>
+            <span>{(totalRam / 1024).toFixed(1)} GB RAM</span>
           </div>
           <div className="flex items-center gap-1.5">
             <HardDrive className="size-4" />

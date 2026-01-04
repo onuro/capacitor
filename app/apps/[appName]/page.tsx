@@ -191,7 +191,6 @@ export default function AppDetailPage({ params }: PageProps) {
             <div className="flex items-center gap-1.5">
               <Globe className="size-4" />
               <span className="font-medium text-foreground">{app.instances}</span>
-              <span>instances</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Cpu className="size-4" />
@@ -200,8 +199,8 @@ export default function AppDetailPage({ params }: PageProps) {
             </div>
             <div className="flex items-center gap-1.5">
               <MemoryStick className="size-4" />
-              <span className="font-medium text-foreground">{totalRam}</span>
-              <span>MB</span>
+              <span className="font-medium text-foreground">{(totalRam / 1024).toFixed(1)}</span>
+              <span>GB</span>
             </div>
             <div className="flex items-center gap-1.5">
               <HardDrive className="size-4" />
@@ -256,7 +255,7 @@ export default function AppDetailPage({ params }: PageProps) {
                           </div>
                           <div>
                             <span className="text-muted-foreground">RAM:</span>{' '}
-                            {component.ram} MB
+                            {(component.ram / 1024).toFixed(1)} GB
                           </div>
                           <div>
                             <span className="text-muted-foreground">HDD:</span>{' '}

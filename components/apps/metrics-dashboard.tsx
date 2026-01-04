@@ -41,7 +41,7 @@ interface MetricCardProps {
 function MetricCard({ title, value, subtitle, icon }: MetricCardProps) {
   return (
     <Card>
-      <CardContent className="pt-6">
+      <CardContent>
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
@@ -95,7 +95,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
       return response;
     },
     enabled: nodesToQuery.length > 0,
-    refetchInterval: 15000,
+    refetchInterval: 3000,
     staleTime: 10000,
     retry: 1,
   });
@@ -222,7 +222,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
               No running instances found. The app may be stopped or still deploying.
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {sortedLocations.map((location, idx) => {
                 const nodeAddress = formatNodeAddress(location);
                 const isMaster = nodeAddress === masterNodeAddress;
@@ -231,9 +231,8 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
                 return (
                   <div
                     key={idx}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      isHighlighted ? 'bg-primary/10 border-primary/30' : 'bg-muted/30'
-                    }`}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${isHighlighted ? 'bg-primary/10 border-primary/30' : 'bg-muted/30'
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <Server className={`size-4 ${isHighlighted ? 'text-primary' : 'text-muted-foreground'}`} />
