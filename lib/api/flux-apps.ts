@@ -37,6 +37,7 @@ export interface AppLocation {
   ip: string;
   broadcastedAt: string;
   expireAt: string;
+  runningSince?: string;
   port?: number;
 }
 

@@ -262,7 +262,7 @@ export function LogViewer({ appName, selectedNode }: LogViewerProps) {
           <ScrollArea className="h-[400px] rounded-md border bg-muted/50" ref={scrollRef}>
             <div className="p-4 font-mono text-sm space-y-1">
               {filteredLogs.length === 0 ? (
-                <p className="text-muted-foreground">No logs available</p>
+                <p className="text-muted-foreground">No logs available yet. Will refresh shortly.</p>
               ) : (
                 filteredLogs.map((log, idx) => (
                   <div

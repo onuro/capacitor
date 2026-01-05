@@ -32,7 +32,7 @@ interface MetricsDashboardProps {
   selectedNode: string;
 }
 
-function formatRelativeTime(date: Date): string {
+function formatDuration(date: Date): string {
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSeconds = Math.floor(diffMs / 1000);
@@ -41,13 +41,13 @@ function formatRelativeTime(date: Date): string {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSeconds < 60) {
-    return 'just now';
+    return 'less than a minute';
   } else if (diffMinutes < 60) {
-    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'}`;
   } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    return `${diffHours} hour${diffHours === 1 ? '' : 's'}`;
   } else {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    return `${diffDays} day${diffDays === 1 ? '' : 's'}`;
   }
 }
 
@@ -289,9 +289,11 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
                       <Server className={`size-4 ${isHighlighted ? 'text-primary' : 'text-muted-foreground'}`} />
                       <div>
                         <p className="font-medium text-sm">{location.ip}</p>
-                        <p className="text-xs text-muted-foreground">
-                          Registered: {formatRelativeTime(new Date(location.broadcastedAt))}
-                        </p>
+                        {location.runningSince && (
+                          <p className="text-xs text-muted-foreground">
+                            Up for {formatDuration(new Date(location.runningSince))}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
