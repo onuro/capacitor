@@ -1,7 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { detectMasterNode } from '@/lib/flux-haproxy';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+
+interface TryNodeResult {
+  success: boolean;
+  response?: NextResponse;
+  error?: string;
+}
+
+/**
+ * Sleep helper for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Try to upload binary file to a single node
+ */
+async function tryNode(
+  nodeIp: string,
+  authHeader: string,
+  appName: string,
+  component: string,
+  folder: string,
+  contentType: string,
+  body: ArrayBuffer
+): Promise<TryNodeResult> {
+  try {
+    const hasPort = nodeIp.includes(':');
+    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
+
+    let endpoint = `/ioutils/fileupload/volume/${appName}/${component}`;
+    if (folder) {
+      endpoint += `/${encodeURIComponent(folder)}`;
+    }
+    const nodeUrl = baseUrl + endpoint;
+
+    console.log(`[UploadBinary] Trying ${nodeIp}...`);
+
+    const response = await fetch(nodeUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': contentType,
+        'zelidauth': authHeader,
+      },
+      body: body,
+      signal: AbortSignal.timeout(120000),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      console.log(`[UploadBinary] ${nodeIp} returned ${response.status}: ${text.slice(0, 100)}`);
+      return { success: false, error: `Node ${nodeIp} returned ${response.status}` };
+    }
+
+    const responseText = await response.text();
+    console.log(`[UploadBinary] ${nodeIp} response:`, responseText.slice(0, 200));
+
+    // Check if response contains error indication
+    if (responseText.includes('"status":"error"')) {
+      try {
+        const data = JSON.parse(responseText);
+        const errorMessage = data.message || data.data?.message || 'Failed to upload file';
+        console.log(`[UploadBinary] ${nodeIp} returned error: ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      } catch {
+        // Continue - might be false positive
+      }
+    }
+
+    console.log(`[UploadBinary] SUCCESS from ${nodeIp}`);
+    return {
+      success: true,
+      response: NextResponse.json({
+        status: 'success',
+        message: 'File uploaded successfully',
+        nodeIp,
+      }),
+    };
+  } catch (error) {
+    console.log(`[UploadBinary] ${nodeIp} failed:`, error instanceof Error ? error.message : error);
+    return { success: false, error: error instanceof Error ? error.message : 'Connection failed' };
+  }
+}
 
 export async function POST(request: NextRequest) {
   const zelidauth = request.headers.get('zelidauth');
@@ -16,32 +100,20 @@ export async function POST(request: NextRequest) {
   try {
     // Get parameters from query string (to avoid parsing FormData body)
     const { searchParams } = new URL(request.url);
-    const nodeIp = searchParams.get('nodeIp');
+    const nodeIpParam = searchParams.get('nodeIp');
     const appName = searchParams.get('appName');
     const component = searchParams.get('component') || 'wp';
     const folder = searchParams.get('folder') || '';
 
-    if (!nodeIp || !appName) {
+    if (!nodeIpParam || !appName) {
       return NextResponse.json(
         { status: 'error', message: 'Missing required parameters (nodeIp, appName)' },
         { status: 400 }
       );
     }
 
-    // Build Flux node URL - use direct HTTP like the file listing API
-    const hasPort = nodeIp.includes(':');
-    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
-
-    let endpoint = `${baseUrl}/ioutils/fileupload/volume/${appName}/${component}`;
-    if (folder) {
-      // URL encode the folder so slashes aren't treated as path separators
-      endpoint += `/${encodeURIComponent(folder)}`;
-    }
-
-    // Also build HTTPS fallback URL for retry
-    const [ip, port = '16127'] = nodeIp.split(':');
-    const dashedIp = ip.replace(/\./g, '-');
-    const httpsEndpoint = `https://${dashedIp}-${port}.node.api.runonflux.io/ioutils/fileupload/volume/${appName}/${component}${folder ? `/${encodeURIComponent(folder)}` : ''}`;
+    // Parse node IPs (support comma-separated list for fallback)
+    const nodeIps = nodeIpParam.split(',').map(ip => ip.trim()).filter(Boolean);
 
     // Parse zelidauth and convert to JSON format for nodes
     const params = new URLSearchParams(zelidauth);
@@ -69,116 +141,63 @@ export async function POST(request: NextRequest) {
     const contentType = request.headers.get('content-type') || '';
     const body = await request.arrayBuffer();
 
-    console.log('=== Binary File Upload Debug ===', new Date().toISOString());
-    console.log('Uploading to (HTTP):', endpoint);
-    console.log('Fallback (HTTPS):', httpsEndpoint);
-    console.log('Content-Type:', contentType);
-    console.log('Body size:', body.byteLength);
+    console.log(`[UploadBinary] Body size: ${body.byteLength}, Content-Type: ${contentType}`);
 
-    // Try HTTP first (direct connection like file listing API)
-    let response: Response;
-    let responseText: string;
-    let usedEndpoint = endpoint;
-
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': contentType,
-          'zelidauth': authHeader,
-        },
-        body: body,
-        signal: AbortSignal.timeout(60000),
-      });
-      responseText = await response.text();
-      console.log('HTTP upload response status:', response.status);
-      console.log('HTTP upload response:', responseText.slice(0, 500));
-    } catch (httpError) {
-      console.log('HTTP upload failed, trying HTTPS fallback:', httpError instanceof Error ? httpError.message : httpError);
-      usedEndpoint = httpsEndpoint;
-
-      // Fallback to HTTPS via Flux DNS
-      response = await fetch(httpsEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': contentType,
-          'zelidauth': authHeader,
-        },
-        body: body,
-        signal: AbortSignal.timeout(120000),
-      });
-      responseText = await response.text();
-      console.log('HTTPS upload response status:', response.status);
-      console.log('HTTPS upload response:', responseText.slice(0, 500));
+    // 1. Detect master node via HAProxy
+    console.log(`[UploadBinary] Detecting master node for ${appName}...`);
+    const masterIp = await detectMasterNode(appName);
+    if (masterIp) {
+      console.log(`[UploadBinary] Master node detected: ${masterIp}`);
+    } else {
+      console.log(`[UploadBinary] No master detected, using client-provided nodes`);
     }
 
-    console.log('Used endpoint:', usedEndpoint);
+    // 2. Reorder nodes: master first, then others
+    const orderedNodes = masterIp
+      ? [masterIp, ...nodeIps.filter(ip => ip !== masterIp)]
+      : nodeIps;
 
-    if (response.ok) {
-      // Check if response contains error
-      if (responseText.includes('error') || responseText.includes('Error')) {
-        console.log('Response contains error indication');
-        return NextResponse.json({
-          status: 'error',
-          message: `Upload may have failed: ${responseText.slice(0, 300)}`,
-        });
-      }
+    let lastError = '';
 
-      // Try to parse as JSON for error checking
-      try {
-        const data = JSON.parse(responseText);
-        if (data.status === 'error') {
-          return NextResponse.json({
-            status: 'error',
-            message: data.message || data.data?.message || 'Failed to upload file',
-          });
+    // 3. If we have a master, try it with retries (3 attempts, 2s delay)
+    if (masterIp && orderedNodes.length > 0) {
+      const masterNode = orderedNodes[0];
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        console.log(`[UploadBinary] Master attempt ${attempt}/3 for ${masterNode}`);
+        const result = await tryNode(masterNode, authHeader, appName, component, folder, contentType, body);
+
+        if (result.success && result.response) {
+          return result.response;
         }
-      } catch {
-        // Non-JSON response - check if it looks like streaming progress
-        console.log('Non-JSON response, treating as streaming progress');
-      }
 
-      // Verify file exists after upload using same baseUrl format
-      try {
-        const verifyEndpoint = `${baseUrl}/apps/getfolderinfo/${appName}/${component}/${encodeURIComponent(folder)}`;
-        console.log('Verifying file at:', verifyEndpoint);
+        lastError = result.error || 'Unknown error';
 
-        const verifyResponse = await fetch(verifyEndpoint, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            zelidauth: authHeader,
-          },
-          signal: AbortSignal.timeout(10000),
-        });
-
-        const verifyText = await verifyResponse.text();
-        console.log('Verify response:', verifyText.slice(0, 500));
-
-        if (verifyResponse.ok) {
-          try {
-            const verifyData = JSON.parse(verifyText);
-            if (verifyData.status === 'success' && Array.isArray(verifyData.data)) {
-              console.log('Files in folder:', verifyData.data.map((f: { name: string }) => f.name));
-            }
-          } catch {
-            console.log('Could not parse verify response');
-          }
+        // Wait before retry (unless last attempt)
+        if (attempt < 3) {
+          console.log(`[UploadBinary] Retrying master in 2s...`);
+          await sleep(2000);
         }
-      } catch (verifyError) {
-        console.warn('File verification failed:', verifyError);
       }
-
-      return NextResponse.json({
-        status: 'success',
-        message: 'File uploaded successfully',
-      });
+      console.log(`[UploadBinary] Master exhausted after 3 attempts, trying fallback nodes...`);
     }
 
-    return NextResponse.json({
-      status: 'error',
-      message: `Upload failed with status ${response.status}: ${responseText.slice(0, 200)}`,
-    });
+    // 4. Fall back to other nodes (one attempt each)
+    const fallbackNodes = masterIp ? orderedNodes.slice(1) : orderedNodes;
+    for (const nodeIp of fallbackNodes) {
+      const result = await tryNode(nodeIp, authHeader, appName, component, folder, contentType, body);
+
+      if (result.success && result.response) {
+        return result.response;
+      }
+
+      lastError = result.error || 'Unknown error';
+    }
+
+    // All nodes failed
+    return NextResponse.json(
+      { status: 'error', message: `Failed to upload file. ${lastError}` },
+      { status: 502 }
+    );
   } catch (error) {
     console.error('Error uploading binary file:', error);
     return NextResponse.json(

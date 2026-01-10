@@ -151,6 +151,45 @@ export async function uploadFile(
 }
 
 /**
+ * Upload a binary file to app storage (via proxy with master node detection)
+ * @param zelidauth - Auth token
+ * @param appName - Name of the application
+ * @param component - Component name
+ * @param nodeIp - Node IP
+ * @param folder - Destination folder path
+ * @param file - File to upload
+ */
+export async function uploadBinaryFile(
+  zelidauth: string,
+  appName: string,
+  component: string,
+  nodeIp: string,
+  folder: string,
+  file: File
+): Promise<FluxApiResponse<string>> {
+  const formData = new FormData();
+  formData.append(file.name, file);
+
+  const params = new URLSearchParams({
+    nodeIp,
+    appName,
+    component,
+    folder,
+  });
+
+  const response = await fetch(`/api/flux/files/upload-binary?${params.toString()}`, {
+    method: 'POST',
+    headers: {
+      zelidauth,
+    },
+    body: formData,
+    signal: AbortSignal.timeout(120000),
+  });
+
+  return response.json();
+}
+
+/**
  * Delete a file or folder from app storage (via proxy)
  * Uses Flux's removeobject endpoint which handles recursive folder deletion
  * @param zelidauth - Auth token

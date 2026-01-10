@@ -33,6 +33,7 @@ import {
   downloadFile,
   saveFile,
   deleteFile,
+  uploadBinaryFile,
   formatFileSize,
   isTextFile,
   type FileInfo,
@@ -64,6 +65,7 @@ import {
   Square,
   CheckSquare,
   MinusSquare,
+  Upload,
 } from 'lucide-react';
 import {
   createHighlighter,
@@ -284,6 +286,15 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     failed: string[];
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+    currentFile: string;
+    failed: string[];
+  } | null>(null);
   const { zelidauth } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -550,6 +561,56 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     }
   };
 
+  const handleUpload = async () => {
+    if (!zelidauth || uploadFiles.length === 0) return;
+
+    setIsUploading(true);
+    const folder = currentPath === '/' ? '' : currentPath.slice(1);
+    const failed: string[] = [];
+    let successCount = 0;
+
+    setUploadProgress({ current: 0, total: uploadFiles.length, currentFile: uploadFiles[0].name, failed: [] });
+
+    for (let i = 0; i < uploadFiles.length; i++) {
+      const file = uploadFiles[i];
+      setUploadProgress({ current: i, total: uploadFiles.length, currentFile: file.name, failed });
+
+      try {
+        const response = await uploadBinaryFile(
+          zelidauth,
+          appName,
+          activeComponent,
+          activeNode,
+          folder,
+          file
+        );
+
+        if (response.status === 'success') {
+          successCount++;
+        } else {
+          failed.push(file.name);
+        }
+      } catch {
+        failed.push(file.name);
+      }
+    }
+
+    setUploadProgress(null);
+    setIsUploading(false);
+
+    if (failed.length === 0) {
+      toast.success(`Uploaded ${successCount} file${successCount > 1 ? 's' : ''}`);
+    } else if (successCount > 0) {
+      toast.warning(`Uploaded ${successCount}, failed ${failed.length}: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}`);
+    } else {
+      toast.error(`Upload failed: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}`);
+    }
+
+    setShowUploadDialog(false);
+    setUploadFiles([]);
+    refetch();
+  };
+
   const pathParts = currentPath.split('/').filter(Boolean);
   const files = data?.data?.files || [];
   const isInitialLoading = specLoading || nodesLoading;
@@ -603,14 +664,25 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
               <Folder className="size-5" />
               File Browser
             </CardTitle>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => refetch()}
-              disabled={isFetching}
-            >
-              <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowUploadDialog(true)}
+                title="Upload file"
+              >
+                <Upload className="size-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetch()}
+                disabled={isFetching}
+                title="Refresh"
+              >
+                <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
           <div className='flex items-center justify-between'>
             <div className="flex items-center gap-1 text-sm mt-2">
@@ -971,6 +1043,147 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
             <Button variant="destructive" onClick={handleBulkDelete}>
               <Trash2 className="size-4 mr-2" />
               Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Upload Dialog */}
+      <Dialog open={showUploadDialog} onOpenChange={(open) => {
+        if (!isUploading) {
+          setShowUploadDialog(open);
+          if (!open) setUploadFiles([]);
+        }
+      }}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Upload Files</DialogTitle>
+            <DialogDescription>
+              Upload files to {currentPath === '/' ? 'root directory' : currentPath}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                uploadFiles.length > 0 ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const files = Array.from(e.dataTransfer.files).filter(f => f.size > 0);
+                if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
+              }}
+            >
+              {uploadFiles.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {uploadFiles.map((file, idx) => (
+                      <div key={`${file.name}-${idx}`} className="flex items-center justify-between text-sm px-2 py-1 bg-muted/50 rounded">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <File className="size-4 shrink-0 text-primary" />
+                          <span className="truncate">{file.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-muted-foreground">
+                            {formatFileSize(file.size)}
+                          </span>
+                          <button
+                            onClick={() => setUploadFiles(prev => prev.filter((_, i) => i !== idx))}
+                            className="text-muted-foreground hover:text-destructive"
+                            disabled={isUploading}
+                          >
+                            <X className="size-3" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {uploadFiles.length} file{uploadFiles.length > 1 ? 's' : ''} selected ({formatFileSize(uploadFiles.reduce((acc, f) => acc + f.size, 0))} total)
+                  </p>
+                  <label className="inline-flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline">
+                    <span>Add more files</span>
+                    <input
+                      type="file"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files || []).filter(f => f.size > 0);
+                        if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center gap-2 cursor-pointer py-4">
+                  <Upload className="size-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">
+                    Drag and drop files here, or click to select
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    You can select multiple files
+                  </p>
+                  <input
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []).filter(f => f.size > 0);
+                      if (files.length > 0) setUploadFiles(files);
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            {uploadProgress && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="truncate">{uploadProgress.currentFile}</span>
+                  <span className="text-muted-foreground shrink-0">
+                    {uploadProgress.current + 1}/{uploadProgress.total}
+                  </span>
+                </div>
+                <div className="h-2 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary transition-all duration-300"
+                    style={{ width: `${((uploadProgress.current + 1) / uploadProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUploadDialog(false);
+                setUploadFiles([]);
+              }}
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={uploadFiles.length === 0 || isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="size-4 mr-2" />
+                  Upload {uploadFiles.length > 0 && `(${uploadFiles.length})`}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
