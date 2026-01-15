@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useState, useEffect, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -11,7 +11,7 @@ import {
   SheetFooter,
   SheetHeader,
   SheetTitle,
-} from '@/components/ui/sheet';
+} from "@/components/ui/sheet";
 import {
   Dialog,
   DialogContent,
@@ -19,15 +19,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
+} from "@/components/ui/select";
 import {
   listFiles,
   downloadFile,
@@ -37,13 +37,13 @@ import {
   formatFileSize,
   isTextFile,
   type FileInfo,
-} from '@/lib/api/flux-files';
-import { getAppSpecification } from '@/lib/api/flux-apps';
-import { formatNodeAddress } from '@/lib/utils';
-import { useAuthStore } from '@/stores/auth';
-import { useNodeSelection } from '@/hooks/use-node-selection';
-import { useResolvedNode } from '@/components/apps/node-picker';
-import { toast } from 'sonner';
+} from "@/lib/api/flux-files";
+import { getAppSpecification } from "@/lib/api/flux-apps";
+import { formatNodeAddress } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
+import { useNodeSelection } from "@/hooks/use-node-selection";
+import { useResolvedNode } from "@/components/apps/node-picker";
+import { toast } from "sonner";
 import {
   Folder,
   File,
@@ -66,16 +66,16 @@ import {
   CheckSquare,
   MinusSquare,
   Upload,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   createHighlighter,
   type Highlighter,
   type BundledLanguage,
-} from 'shiki';
-import dynamic from 'next/dynamic';
+} from "shiki";
+import dynamic from "next/dynamic";
 
 // Lazy load Monaco editor - only loads when editing files
-const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
     <div className="flex items-center justify-center h-full bg-[#1e1e1e]">
@@ -87,130 +87,130 @@ const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
 // Map file extensions to shiki language identifiers
 const extensionToLanguage: Record<string, BundledLanguage> = {
   // JavaScript/TypeScript
-  js: 'javascript',
-  mjs: 'javascript',
-  cjs: 'javascript',
-  jsx: 'jsx',
-  ts: 'typescript',
-  tsx: 'tsx',
+  js: "javascript",
+  mjs: "javascript",
+  cjs: "javascript",
+  jsx: "jsx",
+  ts: "typescript",
+  tsx: "tsx",
   // Python
-  py: 'python',
+  py: "python",
   // Go
-  go: 'go',
+  go: "go",
   // Systems languages
-  rs: 'rust',
-  java: 'java',
-  c: 'c',
-  cpp: 'cpp',
-  h: 'c',
-  hpp: 'cpp',
-  cs: 'csharp',
+  rs: "rust",
+  java: "java",
+  c: "c",
+  cpp: "cpp",
+  h: "c",
+  hpp: "cpp",
+  cs: "csharp",
   // Data formats
-  json: 'json',
-  yaml: 'yaml',
-  yml: 'yaml',
-  xml: 'xml',
-  html: 'html',
-  htm: 'html',
-  svg: 'xml',
+  json: "json",
+  yaml: "yaml",
+  yml: "yaml",
+  xml: "xml",
+  html: "html",
+  htm: "html",
+  svg: "xml",
   // Styles
-  css: 'css',
-  scss: 'scss',
-  sass: 'sass',
-  less: 'less',
+  css: "css",
+  scss: "scss",
+  sass: "sass",
+  less: "less",
   // Docs
-  md: 'markdown',
-  mdx: 'mdx',
+  md: "markdown",
+  mdx: "mdx",
   // Shell/scripts
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
+  sh: "bash",
+  bash: "bash",
+  zsh: "bash",
   // Web languages
-  php: 'php',
-  rb: 'ruby',
-  sql: 'sql',
-  graphql: 'graphql',
-  gql: 'graphql',
+  php: "php",
+  rb: "ruby",
+  sql: "sql",
+  graphql: "graphql",
+  gql: "graphql",
   // Config files
-  dockerfile: 'dockerfile',
-  conf: 'nginx',
-  nginx: 'nginx',
-  ini: 'ini',
-  toml: 'toml',
-  env: 'dotenv',
+  dockerfile: "dockerfile",
+  conf: "nginx",
+  nginx: "nginx",
+  ini: "ini",
+  toml: "toml",
+  env: "dotenv",
   // Makefile
-  makefile: 'makefile',
+  makefile: "makefile",
 };
 
 function getLanguageFromFilename(filename: string): BundledLanguage {
-  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
   const basename = filename.toLowerCase();
 
   // Handle special filenames
-  if (basename === 'dockerfile') return 'dockerfile';
-  if (basename === 'makefile') return 'makefile';
-  if (basename === '.env' || basename.startsWith('.env.')) return 'dotenv';
+  if (basename === "dockerfile") return "dockerfile";
+  if (basename === "makefile") return "makefile";
+  if (basename === ".env" || basename.startsWith(".env.")) return "dotenv";
 
-  return extensionToLanguage[ext] || 'plaintext';
+  return extensionToLanguage[ext] || "plaintext";
 }
 
 // Monaco uses slightly different language IDs
 function getMonacoLanguage(filename: string): string {
-  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const ext = filename.split(".").pop()?.toLowerCase() || "";
   const basename = filename.toLowerCase();
 
   // Special filenames
-  if (basename === 'dockerfile') return 'dockerfile';
-  if (basename === 'makefile') return 'makefile';
-  if (basename === '.env' || basename.startsWith('.env.')) return 'ini';
+  if (basename === "dockerfile") return "dockerfile";
+  if (basename === "makefile") return "makefile";
+  if (basename === ".env" || basename.startsWith(".env.")) return "ini";
 
   const monacoLangMap: Record<string, string> = {
-    js: 'javascript',
-    mjs: 'javascript',
-    cjs: 'javascript',
-    jsx: 'javascript',
-    ts: 'typescript',
-    tsx: 'typescript',
-    py: 'python',
-    go: 'go',
-    rs: 'rust',
-    java: 'java',
-    c: 'c',
-    cpp: 'cpp',
-    h: 'c',
-    hpp: 'cpp',
-    cs: 'csharp',
-    json: 'json',
-    yaml: 'yaml',
-    yml: 'yaml',
-    xml: 'xml',
-    html: 'html',
-    htm: 'html',
-    svg: 'xml',
-    css: 'css',
-    scss: 'scss',
-    sass: 'scss',
-    less: 'less',
-    md: 'markdown',
-    mdx: 'markdown',
-    sh: 'shell',
-    bash: 'shell',
-    zsh: 'shell',
-    php: 'php',
-    rb: 'ruby',
-    sql: 'sql',
-    graphql: 'graphql',
-    gql: 'graphql',
-    dockerfile: 'dockerfile',
-    conf: 'ini',
-    nginx: 'ini',
-    ini: 'ini',
-    toml: 'ini',
-    env: 'ini',
-    makefile: 'makefile',
+    js: "javascript",
+    mjs: "javascript",
+    cjs: "javascript",
+    jsx: "javascript",
+    ts: "typescript",
+    tsx: "typescript",
+    py: "python",
+    go: "go",
+    rs: "rust",
+    java: "java",
+    c: "c",
+    cpp: "cpp",
+    h: "c",
+    hpp: "cpp",
+    cs: "csharp",
+    json: "json",
+    yaml: "yaml",
+    yml: "yaml",
+    xml: "xml",
+    html: "html",
+    htm: "html",
+    svg: "xml",
+    css: "css",
+    scss: "scss",
+    sass: "scss",
+    less: "less",
+    md: "markdown",
+    mdx: "markdown",
+    sh: "shell",
+    bash: "shell",
+    zsh: "shell",
+    php: "php",
+    rb: "ruby",
+    sql: "sql",
+    graphql: "graphql",
+    gql: "graphql",
+    dockerfile: "dockerfile",
+    conf: "ini",
+    nginx: "ini",
+    ini: "ini",
+    toml: "ini",
+    env: "ini",
+    makefile: "makefile",
   };
 
-  return monacoLangMap[ext] || 'plaintext';
+  return monacoLangMap[ext] || "plaintext";
 }
 
 // Singleton highlighter instance
@@ -219,18 +219,46 @@ let highlighterPromise: Promise<Highlighter> | null = null;
 function getHighlighter(): Promise<Highlighter> {
   if (!highlighterPromise) {
     highlighterPromise = createHighlighter({
-      themes: ['one-dark-pro'],
+      themes: ["one-dark-pro"],
       langs: [
-        'javascript', 'typescript', 'jsx', 'tsx', 'python', 'go', 'rust', 'java',
-        'c', 'cpp', 'csharp', 'json', 'yaml', 'xml', 'html', 'css', 'scss', 'sass',
-        'less', 'markdown', 'mdx', 'bash', 'php', 'ruby', 'sql', 'graphql',
-        'dockerfile', 'nginx', 'ini', 'toml', 'makefile', 'plaintext', 'dotenv',
+        "javascript",
+        "typescript",
+        "jsx",
+        "tsx",
+        "python",
+        "go",
+        "rust",
+        "java",
+        "c",
+        "cpp",
+        "csharp",
+        "json",
+        "yaml",
+        "xml",
+        "html",
+        "css",
+        "scss",
+        "sass",
+        "less",
+        "markdown",
+        "mdx",
+        "bash",
+        "php",
+        "ruby",
+        "sql",
+        "graphql",
+        "dockerfile",
+        "nginx",
+        "ini",
+        "toml",
+        "makefile",
+        "plaintext",
+        "dotenv",
       ],
     });
   }
   return highlighterPromise;
 }
-
 
 interface FileBrowserProps {
   appName: string;
@@ -240,34 +268,51 @@ interface FileBrowserProps {
 function getFileIcon(file: FileInfo) {
   if (file.isDirectory) return <Folder className="size-4 text-yellow-500" />;
 
-  const ext = file.name.split('.').pop()?.toLowerCase() || '';
-  const codeExts = ['js', 'ts', 'jsx', 'tsx', 'py', 'go', 'rs', 'java', 'c', 'cpp'];
-  const imageExts = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'];
+  const ext = file.name.split(".").pop()?.toLowerCase() || "";
+  const codeExts = [
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "py",
+    "go",
+    "rs",
+    "java",
+    "c",
+    "cpp",
+  ];
+  const imageExts = ["png", "jpg", "jpeg", "gif", "svg", "webp"];
 
-  if (ext === 'conf') return <FileTerminal className="size-4 text-purple-800" />;
-  if (ext === 'php') return <FileCode2 className="size-4 text-purple-800" />;
-  if (codeExts.includes(ext)) return <FileCode className="size-4 text-blue-500" />;
-  if (imageExts.includes(ext)) return <Image className="size-4 text-green-500" />;
-  if (['txt', 'md', 'json', 'yaml', 'yml', 'xml'].includes(ext))
+  if (ext === "conf")
+    return <FileTerminal className="size-4 text-purple-800" />;
+  if (ext === "php") return <FileCode2 className="size-4 text-purple-800" />;
+  if (codeExts.includes(ext))
+    return <FileCode className="size-4 text-blue-500" />;
+  if (imageExts.includes(ext))
+    return <Image className="size-4 text-green-500" aria-hidden="true" />;
+  if (["txt", "md", "json", "yaml", "yml", "xml"].includes(ext))
     return <FileText className="size-4 text-gray-500" />;
 
   return <File className="size-4 text-gray-400" />;
 }
 
 export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
-  const [currentPath, setCurrentPath] = useState('/');
+  const [currentPath, setCurrentPath] = useState("/");
   const [editingFile, setEditingFile] = useState<FileInfo | null>(null);
-  const [editContent, setEditContent] = useState<string>('');
+  const [editContent, setEditContent] = useState<string>("");
   const [isLoadingFile, setIsLoadingFile] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isViewOnly, setIsViewOnly] = useState(false);
-  const [selectedComponent, setSelectedComponent] = useState<string>('');
+  const [selectedComponent, setSelectedComponent] = useState<string>("");
   const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+  const [, setRetryCount] = useState(0);
   const [showRetryHint, setShowRetryHint] = useState(false);
 
   // Use unified node selection hook for locations
-  const { sortedLocations, isLoading: nodesLoading } = useNodeSelection({ appName, autoSelectMaster: false });
+  const { sortedLocations, isLoading: nodesLoading } = useNodeSelection({
+    appName,
+    autoSelectMaster: false,
+  });
 
   // Resolve "auto" to actual node
   const { resolvedNode } = useResolvedNode(appName, selectedNode);
@@ -275,9 +320,9 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   // Build fallback list: resolved node first, then others
   const allNodeIps = sortedLocations.map((l) => formatNodeAddress(l));
   const nodeIpsForQuery = resolvedNode
-    ? [resolvedNode, ...allNodeIps.filter(ip => ip !== resolvedNode)]
+    ? [resolvedNode, ...allNodeIps.filter((ip) => ip !== resolvedNode)]
     : allNodeIps;
-  const [highlightedHtml, setHighlightedHtml] = useState<string>('');
+  const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<{
@@ -310,14 +355,14 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       try {
         const html = highlighter.codeToHtml(editContent, {
           lang,
-          theme: 'one-dark-pro',
+          theme: "one-dark-pro",
         });
         setHighlightedHtml(html);
       } catch {
         // Fallback to plaintext if language not supported
         const html = highlighter.codeToHtml(editContent, {
-          lang: 'plaintext',
-          theme: 'one-dark-pro',
+          lang: "plaintext",
+          theme: "one-dark-pro",
         });
         setHighlightedHtml(html);
       }
@@ -326,7 +371,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
 
   // Fetch app specification to get component names
   const { data: specData, isLoading: specLoading } = useQuery({
-    queryKey: ['appSpec', appName],
+    queryKey: ["appSpec", appName],
     queryFn: () => getAppSpecification(appName),
     staleTime: 60000,
   });
@@ -334,30 +379,37 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   // For compose apps (version > 3), get component names from compose array
   // For legacy apps (version <= 3), use the app name as the single component
   const composeComponents = specData?.data?.compose?.map((c) => c.name) || [];
-  const components = composeComponents.length > 0 ? composeComponents : [appName];
+  const components =
+    composeComponents.length > 0 ? composeComponents : [appName];
 
   // Auto-select first component if not set
-  const activeComponent = selectedComponent || components[0] || '';
+  const activeComponent = selectedComponent || components[0] || "";
   // For single-file operations (download/save/delete), use the selected node
-  const activeNode = resolvedNode || nodeIpsForQuery[0] || '';
+  const activeNode = resolvedNode || nodeIpsForQuery[0] || "";
 
   // Fetch files - pass all node IPs for fallback with retry logic
-  const {
-    data,
-    isLoading,
-    isError,
-    error,
-    refetch,
-    isFetching,
-    failureCount,
-  } = useQuery({
-    queryKey: ['appFiles', appName, activeComponent, selectedNode, currentPath],
-    queryFn: () => listFiles(zelidauth!, appName, activeComponent, nodeIpsForQuery, currentPath),
-    enabled: !!zelidauth && !!activeComponent && nodeIpsForQuery.length > 0,
-    staleTime: 30000,
-    retry: 2, // Retry 2 times on failure
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
-  });
+  const { data, isLoading, isError, error, refetch, isFetching, failureCount } =
+    useQuery({
+      queryKey: [
+        "appFiles",
+        appName,
+        activeComponent,
+        selectedNode,
+        currentPath,
+      ],
+      queryFn: () =>
+        listFiles(
+          zelidauth!,
+          appName,
+          activeComponent,
+          nodeIpsForQuery,
+          currentPath,
+        ),
+      enabled: !!zelidauth && !!activeComponent && nodeIpsForQuery.length > 0,
+      staleTime: 30000,
+      retry: 2, // Retry 2 times on failure
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
+    });
 
   // Show retry hint after loading for more than 3 seconds
   useEffect(() => {
@@ -387,57 +439,55 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
 
   const handleNavigate = (file: FileInfo) => {
     if (file.isDirectory) {
-      const newPath = currentPath === '/'
-        ? `/${file.name}`
-        : `${currentPath}/${file.name}`;
+      const newPath =
+        currentPath === "/" ? `/${file.name}` : `${currentPath}/${file.name}`;
       setCurrentPath(newPath);
       setSelectedItems(new Set()); // Clear selection on navigation
     }
   };
 
   const handleBack = () => {
-    const parts = currentPath.split('/').filter(Boolean);
+    const parts = currentPath.split("/").filter(Boolean);
     parts.pop();
-    setCurrentPath(parts.length === 0 ? '/' : `/${parts.join('/')}`);
+    setCurrentPath(parts.length === 0 ? "/" : `/${parts.join("/")}`);
     setSelectedItems(new Set()); // Clear selection on navigation
   };
 
   const handleOpenFile = async (file: FileInfo, viewOnly: boolean = false) => {
     if (!isTextFile(file.name)) {
-      toast.error('Cannot open this file type');
+      toast.error("Cannot open this file type");
       return;
     }
     if (!zelidauth) {
-      toast.error('Authentication required');
+      toast.error("Authentication required");
       return;
     }
 
     setIsLoadingFile(true);
     setEditingFile(file);
     setIsViewOnly(viewOnly);
-    setEditContent('');
+    setEditContent("");
 
     try {
-      const filePath = currentPath === '/'
-        ? `/${file.name}`
-        : `${currentPath}/${file.name}`;
+      const filePath =
+        currentPath === "/" ? `/${file.name}` : `${currentPath}/${file.name}`;
 
       const response = await downloadFile(
         zelidauth,
         appName,
         activeComponent,
         activeNode,
-        filePath
+        filePath,
       );
 
-      if (response.status === 'success' && response.data !== undefined) {
+      if (response.status === "success" && response.data !== undefined) {
         setEditContent(response.data);
       } else {
-        toast.error(response.message || 'Failed to load file');
+        toast.error(response.message || "Failed to load file");
         setEditingFile(null);
       }
     } catch (error) {
-      toast.error('Failed to load file');
+      toast.error("Failed to load file");
       setEditingFile(null);
     } finally {
       setIsLoadingFile(false);
@@ -449,9 +499,10 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
 
     setIsSaving(true);
     try {
-      const filePath = currentPath === '/'
-        ? `/${editingFile.name}`
-        : `${currentPath}/${editingFile.name}`;
+      const filePath =
+        currentPath === "/"
+          ? `/${editingFile.name}`
+          : `${currentPath}/${editingFile.name}`;
 
       const response = await saveFile(
         zelidauth,
@@ -459,18 +510,18 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
         activeComponent,
         activeNode,
         filePath,
-        editContent
+        editContent,
       );
 
-      if (response.status === 'success') {
-        toast.success('File saved successfully');
+      if (response.status === "success") {
+        toast.success("File saved successfully");
         setEditingFile(null);
         refetch(); // Refresh file list
       } else {
-        toast.error(response.message || 'Failed to save file');
+        toast.error(response.message || "Failed to save file");
       }
     } catch (error) {
-      toast.error('Failed to save file');
+      toast.error("Failed to save file");
     } finally {
       setIsSaving(false);
     }
@@ -478,13 +529,13 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
 
   const handleCloseEditor = () => {
     setEditingFile(null);
-    setEditContent('');
+    setEditContent("");
     setIsViewOnly(false);
   };
 
   // Selection handlers
   const toggleSelection = (fileName: string) => {
-    setSelectedItems(prev => {
+    setSelectedItems((prev) => {
       const next = new Set(prev);
       if (next.has(fileName)) {
         next.delete(fileName);
@@ -499,7 +550,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     if (selectedItems.size === files.length) {
       setSelectedItems(new Set());
     } else {
-      setSelectedItems(new Set(files.map(f => f.name)));
+      setSelectedItems(new Set(files.map((f) => f.name)));
     }
   };
 
@@ -514,21 +565,32 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     for (let i = 0; i < items.length; i += concurrency) {
       const batch = items.slice(i, i + concurrency);
       const responses = await Promise.allSettled(
-        batch.map(name => {
-          const filePath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`;
-          return deleteFile(zelidauth!, appName, activeComponent, activeNode, filePath);
-        })
+        batch.map((name) => {
+          const filePath =
+            currentPath === "/" ? `/${name}` : `${currentPath}/${name}`;
+          return deleteFile(
+            zelidauth!,
+            appName,
+            activeComponent,
+            activeNode,
+            filePath,
+          );
+        }),
       );
 
       responses.forEach((res, idx) => {
-        if (res.status === 'fulfilled' && res.value.status === 'success') {
+        if (res.status === "fulfilled" && res.value.status === "success") {
           results.success++;
         } else {
           results.failed.push(batch[idx]);
         }
       });
 
-      setDeleteProgress({ done: i + batch.length, total: items.length, failed: results.failed });
+      setDeleteProgress({
+        done: i + batch.length,
+        total: items.length,
+        failed: results.failed,
+      });
     }
 
     return results;
@@ -546,15 +608,19 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       const results = await deleteInBatches(items);
 
       if (results.failed.length === 0) {
-        toast.success(`Deleted ${results.success} item${results.success > 1 ? 's' : ''}`);
+        toast.success(
+          `Deleted ${results.success} item${results.success > 1 ? "s" : ""}`,
+        );
       } else {
-        toast.warning(`Deleted ${results.success}, failed ${results.failed.length}`);
+        toast.warning(
+          `Deleted ${results.success}, failed ${results.failed.length}`,
+        );
       }
 
       setSelectedItems(new Set());
       refetch();
     } catch (error) {
-      toast.error('Delete operation failed');
+      toast.error("Delete operation failed");
     } finally {
       setIsDeleting(false);
       setDeleteProgress(null);
@@ -565,15 +631,25 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     if (!zelidauth || uploadFiles.length === 0) return;
 
     setIsUploading(true);
-    const folder = currentPath === '/' ? '' : currentPath.slice(1);
+    const folder = currentPath === "/" ? "" : currentPath.slice(1);
     const failed: string[] = [];
     let successCount = 0;
 
-    setUploadProgress({ current: 0, total: uploadFiles.length, currentFile: uploadFiles[0].name, failed: [] });
+    setUploadProgress({
+      current: 0,
+      total: uploadFiles.length,
+      currentFile: uploadFiles[0].name,
+      failed: [],
+    });
 
     for (let i = 0; i < uploadFiles.length; i++) {
       const file = uploadFiles[i];
-      setUploadProgress({ current: i, total: uploadFiles.length, currentFile: file.name, failed });
+      setUploadProgress({
+        current: i,
+        total: uploadFiles.length,
+        currentFile: file.name,
+        failed,
+      });
 
       try {
         const response = await uploadBinaryFile(
@@ -582,10 +658,10 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
           activeComponent,
           activeNode,
           folder,
-          file
+          file,
         );
 
-        if (response.status === 'success') {
+        if (response.status === "success") {
           successCount++;
         } else {
           failed.push(file.name);
@@ -599,11 +675,17 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     setIsUploading(false);
 
     if (failed.length === 0) {
-      toast.success(`Uploaded ${successCount} file${successCount > 1 ? 's' : ''}`);
+      toast.success(
+        `Uploaded ${successCount} file${successCount > 1 ? "s" : ""}`,
+      );
     } else if (successCount > 0) {
-      toast.warning(`Uploaded ${successCount}, failed ${failed.length}: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}`);
+      toast.warning(
+        `Uploaded ${successCount}, failed ${failed.length}: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "..." : ""}`,
+      );
     } else {
-      toast.error(`Upload failed: ${failed.slice(0, 3).join(', ')}${failed.length > 3 ? '...' : ''}`);
+      toast.error(
+        `Upload failed: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "..." : ""}`,
+      );
     }
 
     setShowUploadDialog(false);
@@ -611,7 +693,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     refetch();
   };
 
-  const pathParts = currentPath.split('/').filter(Boolean);
+  const pathParts = currentPath.split("/").filter(Boolean);
   const files = data?.data?.files || [];
   const isInitialLoading = specLoading || nodesLoading;
 
@@ -657,7 +739,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
 
   return (
     <>
-      <Card className='gap-0 flex-1'>
+      <Card className="gap-0 flex-1">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
@@ -680,18 +762,16 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                 disabled={isFetching}
                 title="Refresh"
               >
-                <RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`size-4 ${isFetching ? "animate-spin" : ""}`}
+                />
               </Button>
             </div>
           </div>
-          <div className='flex items-center justify-between'>
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-1 text-sm mt-2">
-              {currentPath !== '/' && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={handleBack}
-                >
+              {currentPath !== "/" && (
+                <Button variant="ghost" size="icon-sm" onClick={handleBack}>
                   <ArrowLeft className="size-4" />
                 </Button>
               )}
@@ -699,7 +779,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                 variant="ghost"
                 size="icon-sm"
                 onClick={() => {
-                  setCurrentPath('/');
+                  setCurrentPath("/");
                   setSelectedItems(new Set());
                 }}
               >
@@ -713,7 +793,8 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                     size="sm"
                     className="px-2"
                     onClick={() => {
-                      const newPath = '/' + pathParts.slice(0, idx + 1).join('/');
+                      const newPath =
+                        "/" + pathParts.slice(0, idx + 1).join("/");
                       setCurrentPath(newPath);
                       setSelectedItems(new Set());
                     }}
@@ -729,7 +810,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                   value={activeComponent}
                   onValueChange={(val) => {
                     setSelectedComponent(val);
-                    setCurrentPath('/');
+                    setCurrentPath("/");
                     setSelectedItems(new Set());
                   }}
                 >
@@ -767,7 +848,9 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                     <MinusSquare className="size-4 text-primary" />
                   )}
                   <span className="text-sm text-muted-foreground">
-                    {selectedItems.size > 0 ? `${selectedItems.size} selected` : 'Select all'}
+                    {selectedItems.size > 0
+                      ? `${selectedItems.size} selected`
+                      : "Select all"}
                   </span>
                 </button>
               </div>
@@ -809,7 +892,9 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
               <Loader2 className="size-8 animate-spin text-primary" />
               <div className="text-center">
                 <p className="text-sm font-medium">
-                  {failureCount > 0 ? `Retrying... (attempt ${failureCount + 1}/3)` : 'Loading files...'}
+                  {failureCount > 0
+                    ? `Retrying... (attempt ${failureCount + 1}/3)`
+                    : "Loading files..."}
                 </p>
                 {showRetryHint && (
                   <p className="text-xs text-muted-foreground mt-1">
@@ -818,7 +903,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                 )}
               </div>
             </div>
-          ) : isError || data?.status === 'error' ? (
+          ) : isError || data?.status === "error" ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <div className="size-12 rounded-full bg-destructive/10 flex items-center justify-center">
                 <X className="size-6 text-destructive" />
@@ -826,11 +911,15 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
               <div className="text-center max-w-sm">
                 <p className="font-medium">Unable to load files</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {data?.message?.includes('volume not found')
-                    ? 'This app may not have persistent storage configured.'
-                    : data?.message?.includes('fetch failed') || error?.message?.includes('fetch failed')
-                    ? 'Could not connect to the app node. The node may be temporarily unavailable.'
-                    : data?.message || (error instanceof Error ? error.message : 'Please check that the app is running and try again.')}
+                  {data?.message?.includes("volume not found")
+                    ? "This app may not have persistent storage configured."
+                    : data?.message?.includes("fetch failed") ||
+                        error?.message?.includes("fetch failed")
+                      ? "Could not connect to the app node. The node may be temporarily unavailable."
+                      : data?.message ||
+                        (error instanceof Error
+                          ? error.message
+                          : "Please check that the app is running and try again.")}
                 </p>
               </div>
               <Button onClick={handleRetry} variant="outline" className="mt-2">
@@ -855,7 +944,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                   .map((file) => (
                     <div
                       key={file.name}
-                      className={`flex items-center justify-between p-2 rounded-lg hover:bg-muted group select-none ${selectedItems.has(file.name) ? 'bg-muted/50' : ''} ${file.isDirectory ? 'cursor-pointer' : ''}`}
+                      className={`flex items-center justify-between p-2 rounded-lg hover:bg-muted group select-none ${selectedItems.has(file.name) ? "bg-muted/50" : ""} ${file.isDirectory ? "cursor-pointer" : ""}`}
                       onClick={() => handleNavigate(file)}
                       onDoubleClick={() => {
                         if (file.isDirectory) {
@@ -881,7 +970,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                           )}
                         </button>
                         <button
-                          className={`flex items-center gap-3 flex-1 text-left min-w-0 ${file.isDirectory ? 'cursor-pointer' : 'cursor-auto'}`}
+                          className={`flex items-center gap-3 flex-1 text-left min-w-0 ${file.isDirectory ? "cursor-pointer" : "cursor-auto"}`}
                           onClick={() => handleNavigate(file)}
                         >
                           {getFileIcon(file)}
@@ -927,15 +1016,24 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       </Card>
 
       <Sheet open={!!editingFile} onOpenChange={handleCloseEditor}>
-        <SheetContent side="left" className="w-full !max-w-[1200px] flex flex-col">
-          <SheetHeader className='pb-0'>
+        <SheetContent
+          side="left"
+          className="w-full !max-w-[1200px] flex flex-col"
+        >
+          <SheetHeader className="pb-0">
             <SheetTitle className="flex items-center gap-2">
-              {isViewOnly ? <Eye className="size-4" /> : <Edit3 className="size-4" />}
+              {isViewOnly ? (
+                <Eye className="size-4" />
+              ) : (
+                <Edit3 className="size-4" />
+              )}
               {editingFile?.name}
-              {!isViewOnly && <span className="text-xs text-muted-foreground">(editing)</span>}
+              {!isViewOnly && (
+                <span className="text-xs text-muted-foreground">(editing)</span>
+              )}
             </SheetTitle>
             <SheetDescription>
-              {currentPath === '/' ? '/' : currentPath}/{editingFile?.name}
+              {currentPath === "/" ? "/" : currentPath}/{editingFile?.name}
             </SheetDescription>
           </SheetHeader>
 
@@ -947,7 +1045,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
             <ScrollArea className="flex-1 border">
               <div
                 className="shiki-wrapper"
-                style={{ fontSize: '0.75rem' }}
+                style={{ fontSize: "0.75rem" }}
                 dangerouslySetInnerHTML={{ __html: highlightedHtml }}
               />
               <style jsx global>{`
@@ -978,21 +1076,25 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
             <div className="flex-1 border overflow-hidden">
               <MonacoEditor
                 height="100%"
-                language={editingFile ? getMonacoLanguage(editingFile.name) : 'plaintext'}
+                language={
+                  editingFile
+                    ? getMonacoLanguage(editingFile.name)
+                    : "plaintext"
+                }
                 value={editContent}
-                onChange={(value) => setEditContent(value || '')}
+                onChange={(value) => setEditContent(value || "")}
                 theme="vs-dark"
                 options={{
                   minimap: { enabled: false },
                   fontSize: 13,
-                  lineNumbers: 'on',
+                  lineNumbers: "on",
                   scrollBeyondLastLine: false,
-                  wordWrap: 'on',
+                  wordWrap: "on",
                   automaticLayout: true,
                   bracketPairColorization: { enabled: true },
-                  matchBrackets: 'always',
-                  autoClosingBrackets: 'always',
-                  autoClosingQuotes: 'always',
+                  matchBrackets: "always",
+                  autoClosingBrackets: "always",
+                  autoClosingQuotes: "always",
                   formatOnPaste: true,
                   tabSize: 2,
                 }}
@@ -1003,10 +1105,14 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
           <SheetFooter className="mt-auto pt-0 flex-row gap-2">
             <Button variant="outline" onClick={handleCloseEditor}>
               <X className="size-4 mr-2" />
-              {isViewOnly ? 'Close' : 'Cancel'}
+              {isViewOnly ? "Close" : "Cancel"}
             </Button>
             {!isViewOnly && (
-              <Button onClick={handleSaveFile} disabled={isSaving} className='flex-1'>
+              <Button
+                onClick={handleSaveFile}
+                disabled={isSaving}
+                className="flex-1"
+              >
                 {isSaving ? (
                   <Loader2 className="size-4 mr-2 animate-spin" />
                 ) : (
@@ -1023,21 +1129,34 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Delete {selectedItems.size} item{selectedItems.size > 1 ? 's' : ''}?</DialogTitle>
+            <DialogTitle>
+              Delete {selectedItems.size} item
+              {selectedItems.size > 1 ? "s" : ""}?
+            </DialogTitle>
             <DialogDescription>
-              This action cannot be undone. The following will be permanently deleted:
+              This action cannot be undone. The following will be permanently
+              deleted:
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-32 overflow-y-auto text-sm text-muted-foreground">
-            {Array.from(selectedItems).slice(0, 10).map(name => (
-              <div key={name} className="truncate">• {name}</div>
-            ))}
+            {Array.from(selectedItems)
+              .slice(0, 10)
+              .map((name) => (
+                <div key={name} className="truncate">
+                  • {name}
+                </div>
+              ))}
             {selectedItems.size > 10 && (
-              <div className="text-xs mt-1">...and {selectedItems.size - 10} more</div>
+              <div className="text-xs mt-1">
+                ...and {selectedItems.size - 10} more
+              </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleBulkDelete}>
@@ -1049,23 +1168,29 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       </Dialog>
 
       {/* Upload Dialog */}
-      <Dialog open={showUploadDialog} onOpenChange={(open) => {
-        if (!isUploading) {
-          setShowUploadDialog(open);
-          if (!open) setUploadFiles([]);
-        }
-      }}>
+      <Dialog
+        open={showUploadDialog}
+        onOpenChange={(open) => {
+          if (!isUploading) {
+            setShowUploadDialog(open);
+            if (!open) setUploadFiles([]);
+          }
+        }}
+      >
         <DialogContent showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>Upload Files</DialogTitle>
             <DialogDescription>
-              Upload files to {currentPath === '/' ? 'root directory' : currentPath}
+              Upload files to{" "}
+              {currentPath === "/" ? "root directory" : currentPath}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                uploadFiles.length > 0 ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                uploadFiles.length > 0
+                  ? "border-primary bg-primary/5"
+                  : "border-muted-foreground/25 hover:border-muted-foreground/50"
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -1074,15 +1199,21 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
               onDrop={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const files = Array.from(e.dataTransfer.files).filter(f => f.size > 0);
-                if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
+                const files = Array.from(e.dataTransfer.files).filter(
+                  (f) => f.size > 0,
+                );
+                if (files.length > 0)
+                  setUploadFiles((prev) => [...prev, ...files]);
               }}
             >
               {uploadFiles.length > 0 ? (
                 <div className="space-y-2">
                   <div className="max-h-40 overflow-y-auto space-y-1">
                     {uploadFiles.map((file, idx) => (
-                      <div key={`${file.name}-${idx}`} className="flex items-center justify-between text-sm px-2 py-1 bg-muted/50 rounded">
+                      <div
+                        key={`${file.name}-${idx}`}
+                        className="flex items-center justify-between text-sm px-2 py-1 bg-muted/50 rounded"
+                      >
                         <div className="flex items-center gap-2 min-w-0">
                           <File className="size-4 shrink-0 text-primary" />
                           <span className="truncate">{file.name}</span>
@@ -1092,7 +1223,11 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                             {formatFileSize(file.size)}
                           </span>
                           <button
-                            onClick={() => setUploadFiles(prev => prev.filter((_, i) => i !== idx))}
+                            onClick={() =>
+                              setUploadFiles((prev) =>
+                                prev.filter((_, i) => i !== idx),
+                              )
+                            }
                             className="text-muted-foreground hover:text-destructive"
                             disabled={isUploading}
                           >
@@ -1103,7 +1238,12 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {uploadFiles.length} file{uploadFiles.length > 1 ? 's' : ''} selected ({formatFileSize(uploadFiles.reduce((acc, f) => acc + f.size, 0))} total)
+                    {uploadFiles.length} file{uploadFiles.length > 1 ? "s" : ""}{" "}
+                    selected (
+                    {formatFileSize(
+                      uploadFiles.reduce((acc, f) => acc + f.size, 0),
+                    )}{" "}
+                    total)
                   </p>
                   <label className="inline-flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline">
                     <span>Add more files</span>
@@ -1112,9 +1252,12 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                       multiple
                       className="hidden"
                       onChange={(e) => {
-                        const files = Array.from(e.target.files || []).filter(f => f.size > 0);
-                        if (files.length > 0) setUploadFiles(prev => [...prev, ...files]);
-                        e.target.value = '';
+                        const files = Array.from(e.target.files || []).filter(
+                          (f) => f.size > 0,
+                        );
+                        if (files.length > 0)
+                          setUploadFiles((prev) => [...prev, ...files]);
+                        e.target.value = "";
                       }}
                     />
                   </label>
@@ -1133,9 +1276,11 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                     multiple
                     className="hidden"
                     onChange={(e) => {
-                      const files = Array.from(e.target.files || []).filter(f => f.size > 0);
+                      const files = Array.from(e.target.files || []).filter(
+                        (f) => f.size > 0,
+                      );
                       if (files.length > 0) setUploadFiles(files);
-                      e.target.value = '';
+                      e.target.value = "";
                     }}
                   />
                 </label>
@@ -1152,7 +1297,9 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                 <div className="h-2 bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary transition-all duration-300"
-                    style={{ width: `${((uploadProgress.current + 1) / uploadProgress.total) * 100}%` }}
+                    style={{
+                      width: `${((uploadProgress.current + 1) / uploadProgress.total) * 100}%`,
+                    }}
                   />
                 </div>
               </div>

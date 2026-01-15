@@ -1,6 +1,11 @@
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Zap,
   Server,
@@ -10,7 +15,7 @@ import {
   Cpu,
   HardDrive,
   Network,
-} from 'lucide-react';
+} from "lucide-react";
 
 export default function Home() {
   return (
@@ -22,17 +27,20 @@ export default function Home() {
             <Zap className="size-4" />
             Powered by FluxCloud
           </div>
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6">
+            <Zap className="size-4" />
+            Powered by FluxCloud
+          </div>
 
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6">
-            Deploy Your Apps on{' '}
-            <span className="text-primary">Decentralized</span>{' '}
-            Infrastructure
+            Deploy Your Apps on{" "}
+            <span className="text-primary">Decentralized</span> Infrastructure
           </h1>
 
           <p className="mx-auto max-w-2xl text-lg text-muted-foreground mb-8">
-            Capacitor makes it simple to deploy Docker containers across the Flux
-            decentralized cloud network. High availability, global distribution,
-            and transparent pricing.
+            Capacitor makes it simple to deploy Docker containers across the
+            Flux decentralized cloud network. High availability, global
+            distribution, and transparent pricing.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -61,7 +69,8 @@ export default function Home() {
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold mb-4">Why FluxCloud?</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Deploy your applications with confidence on a truly decentralized network
+              Deploy your applications with confidence on a truly decentralized
+              network
             </p>
           </div>
 
@@ -71,7 +80,8 @@ export default function Home() {
                 <Server className="size-10 text-primary mb-2" />
                 <CardTitle>Global Distribution</CardTitle>
                 <CardDescription>
-                  Your app runs on multiple nodes worldwide for low latency and high availability
+                  Your app runs on multiple nodes worldwide for low latency and
+                  high availability
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -81,7 +91,8 @@ export default function Home() {
                 <Shield className="size-10 text-primary mb-2" />
                 <CardTitle>Decentralized & Secure</CardTitle>
                 <CardDescription>
-                  No single point of failure. Your data and apps are distributed across the network
+                  No single point of failure. Your data and apps are distributed
+                  across the network
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -91,7 +102,8 @@ export default function Home() {
                 <Globe className="size-10 text-primary mb-2" />
                 <CardTitle>Free Domain</CardTitle>
                 <CardDescription>
-                  Every app gets a free subdomain at yourapp.app.runonflux.io out of the box
+                  Every app gets a free subdomain at yourapp.app.runonflux.io
+                  out of the box
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -101,7 +113,8 @@ export default function Home() {
                 <Cpu className="size-10 text-primary mb-2" />
                 <CardTitle>Flexible Resources</CardTitle>
                 <CardDescription>
-                  Choose exactly the CPU, RAM, and storage your application needs
+                  Choose exactly the CPU, RAM, and storage your application
+                  needs
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -111,7 +124,8 @@ export default function Home() {
                 <HardDrive className="size-10 text-primary mb-2" />
                 <CardTitle>Docker Native</CardTitle>
                 <CardDescription>
-                  Deploy any Docker image directly. No complex configuration required
+                  Deploy any Docker image directly. No complex configuration
+                  required
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -121,7 +135,8 @@ export default function Home() {
                 <Network className="size-10 text-primary mb-2" />
                 <CardTitle>Load Balanced</CardTitle>
                 <CardDescription>
-                  Built-in load balancing across all your instances automatically
+                  Built-in load balancing across all your instances
+                  automatically
                 </CardDescription>
               </CardHeader>
             </Card>

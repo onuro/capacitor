@@ -16,7 +16,8 @@
       "Bash(\"http://88.99.52.117:16127/apps/appexec\" )",
       "Bash(grep:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "mcp__acp__Edit"
     ]
   }
 }
