@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,11 +29,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  listFiles,
-  downloadFile,
-  saveFile,
-  deleteFile,
-  uploadBinaryFile,
   formatFileSize,
   isTextFile,
   type FileInfo,
@@ -42,7 +37,7 @@ import { getAppSpecification } from "@/lib/api/flux-apps";
 import { formatNodeAddress } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useNodeSelection } from "@/hooks/use-node-selection";
-import { useResolvedNode } from "@/components/apps/node-picker";
+import { useFileOperations } from "@/hooks/use-file-operations";
 import { toast } from "sonner";
 import {
   Folder,
@@ -262,7 +257,6 @@ function getHighlighter(): Promise<Highlighter> {
 
 interface FileBrowserProps {
   appName: string;
-  selectedNode: string;
 }
 
 function getFileIcon(file: FileInfo) {
@@ -296,7 +290,7 @@ function getFileIcon(file: FileInfo) {
   return <File className="size-4 text-gray-400" />;
 }
 
-export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
+export function FileBrowser({ appName }: FileBrowserProps) {
   const [currentPath, setCurrentPath] = useState("/");
   const [editingFile, setEditingFile] = useState<FileInfo | null>(null);
   const [editContent, setEditContent] = useState<string>("");
@@ -308,20 +302,18 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   const [, setRetryCount] = useState(0);
   const [showRetryHint, setShowRetryHint] = useState(false);
 
-  // Use unified node selection hook for locations
-  const { sortedLocations, isLoading: nodesLoading } = useNodeSelection({
+  // Use unified node selection hook for locations and master detection
+  const {
+    sortedLocations,
+    masterNodeAddress,
+    isLoading: nodesLoading,
+  } = useNodeSelection({
     appName,
     autoSelectMaster: false,
   });
 
-  // Resolve "auto" to actual node
-  const { resolvedNode } = useResolvedNode(appName, selectedNode);
-
-  // Build fallback list: resolved node first, then others
+  // Build node IPs list
   const allNodeIps = sortedLocations.map((l) => formatNodeAddress(l));
-  const nodeIpsForQuery = resolvedNode
-    ? [resolvedNode, ...allNodeIps.filter((ip) => ip !== resolvedNode)]
-    : allNodeIps;
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -341,7 +333,6 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     failed: string[];
   } | null>(null);
   const { zelidauth } = useAuthStore();
-  const queryClient = useQueryClient();
 
   // Load shiki highlighter on mount
   useEffect(() => {
@@ -384,32 +375,41 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
 
   // Auto-select first component if not set
   const activeComponent = selectedComponent || components[0] || "";
-  // For single-file operations (download/save/delete), use the selected node
-  const activeNode = resolvedNode || nodeIpsForQuery[0] || "";
 
-  // Fetch files - pass all node IPs for fallback with retry logic
-  const { data, isLoading, isError, error, refetch, isFetching, failureCount } =
-    useQuery({
-      queryKey: [
-        "appFiles",
-        appName,
-        activeComponent,
-        selectedNode,
-        currentPath,
-      ],
-      queryFn: () =>
-        listFiles(
-          zelidauth!,
-          appName,
-          activeComponent,
-          nodeIpsForQuery,
-          currentPath,
-        ),
-      enabled: !!zelidauth && !!activeComponent && nodeIpsForQuery.length > 0,
-      staleTime: 30000,
-      retry: 2, // Retry 2 times on failure
-      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Exponential backoff
-    });
+  // Use file operations hook with automatic node fallback
+  const {
+    activeNode,
+    error: fileOpsError,
+    listFiles: listFilesOp,
+    downloadFile: downloadFileOp,
+    saveFile: saveFileOp,
+    uploadBinaryFile: uploadBinaryFileOp,
+    deleteFile: deleteFileOp,
+  } = useFileOperations({
+    appName,
+    component: activeComponent,
+    nodeIps: allNodeIps,
+    masterNodeAddress,
+    zelidauth: zelidauth || "",
+  });
+
+  // Fetch files using the hook
+  const {
+    data: filesData,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+    failureCount,
+  } = useQuery({
+    queryKey: ["appFiles", appName, activeComponent, currentPath, activeNode],
+    queryFn: () => listFilesOp(currentPath),
+    enabled:
+      !!zelidauth && !!activeComponent && allNodeIps.length > 0 && !!activeNode,
+    staleTime: 30000,
+    retry: 0, // Hook handles retries internally
+  });
 
   // Show retry hint after loading for more than 3 seconds
   useEffect(() => {
@@ -472,22 +472,14 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       const filePath =
         currentPath === "/" ? `/${file.name}` : `${currentPath}/${file.name}`;
 
-      const response = await downloadFile(
-        zelidauth,
-        appName,
-        activeComponent,
-        activeNode,
-        filePath,
-      );
+      const content = await downloadFileOp(filePath);
 
-      if (response.status === "success" && response.data !== undefined) {
-        setEditContent(response.data);
+      if (content !== null) {
+        setEditContent(content);
       } else {
-        toast.error(response.message || "Failed to load file");
         setEditingFile(null);
       }
-    } catch (error) {
-      toast.error("Failed to load file");
+    } catch {
       setEditingFile(null);
     } finally {
       setIsLoadingFile(false);
@@ -504,24 +496,13 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
           ? `/${editingFile.name}`
           : `${currentPath}/${editingFile.name}`;
 
-      const response = await saveFile(
-        zelidauth,
-        appName,
-        activeComponent,
-        activeNode,
-        filePath,
-        editContent,
-      );
+      const success = await saveFileOp(filePath, editContent);
 
-      if (response.status === "success") {
+      if (success) {
         toast.success("File saved successfully");
         setEditingFile(null);
-        refetch(); // Refresh file list
-      } else {
-        toast.error(response.message || "Failed to save file");
+        refetch();
       }
-    } catch (error) {
-      toast.error("Failed to save file");
     } finally {
       setIsSaving(false);
     }
@@ -568,18 +549,12 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
         batch.map((name) => {
           const filePath =
             currentPath === "/" ? `/${name}` : `${currentPath}/${name}`;
-          return deleteFile(
-            zelidauth!,
-            appName,
-            activeComponent,
-            activeNode,
-            filePath,
-          );
+          return deleteFileOp(filePath);
         }),
       );
 
       responses.forEach((res, idx) => {
-        if (res.status === "fulfilled" && res.value.status === "success") {
+        if (res.status === "fulfilled" && res.value === true) {
           results.success++;
         } else {
           results.failed.push(batch[idx]);
@@ -652,16 +627,9 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       });
 
       try {
-        const response = await uploadBinaryFile(
-          zelidauth,
-          appName,
-          activeComponent,
-          activeNode,
-          folder,
-          file,
-        );
+        const success = await uploadBinaryFileOp(folder, file);
 
-        if (response.status === "success") {
+        if (success) {
           successCount++;
         } else {
           failed.push(file.name);
@@ -694,7 +662,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   };
 
   const pathParts = currentPath.split("/").filter(Boolean);
-  const files = data?.data?.files || [];
+  const files = filesData?.files || [];
   const isInitialLoading = specLoading || nodesLoading;
 
   if (!zelidauth) {
@@ -742,10 +710,17 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       <Card className="gap-0 flex-1">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Folder className="size-5" />
-              File Browser
-            </CardTitle>
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Folder className="size-5" />
+                File Browser
+              </CardTitle>
+              {activeNode && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Node: {activeNode}
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -903,7 +878,7 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                 )}
               </div>
             </div>
-          ) : isError || data?.status === "error" ? (
+          ) : isError || fileOpsError ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
               <div className="size-12 rounded-full bg-destructive/10 flex items-center justify-center">
                 <X className="size-6 text-destructive" />
@@ -911,12 +886,12 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
               <div className="text-center max-w-sm">
                 <p className="font-medium">Unable to load files</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {data?.message?.includes("volume not found")
+                  {fileOpsError?.includes("volume not found")
                     ? "This app may not have persistent storage configured."
-                    : data?.message?.includes("fetch failed") ||
+                    : fileOpsError?.includes("fetch failed") ||
                         error?.message?.includes("fetch failed")
                       ? "Could not connect to the app node. The node may be temporarily unavailable."
-                      : data?.message ||
+                      : fileOpsError ||
                         (error instanceof Error
                           ? error.message
                           : "Please check that the app is running and try again.")}

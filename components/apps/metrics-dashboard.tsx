@@ -1,20 +1,20 @@
-'use client';
+"use client";
 
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { UsageBarChart } from '@/components/ui/usage-bar-chart';
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { UsageBarChart } from "@/components/ui/usage-bar-chart";
 import {
   getAppStatsFromNodes,
   formatBytes,
   formatCpu,
-} from '@/lib/api/flux-metrics';
-import { formatNodeAddress } from '@/lib/utils';
-import { useAuthStore } from '@/stores/auth';
-import { useNodeSelection } from '@/hooks/use-node-selection';
-import { useResolvedNode } from '@/components/apps/node-picker';
+} from "@/lib/api/flux-metrics";
+import { formatNodeAddress, isSameNodeIp } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth";
+import { useNodeSelection } from "@/hooks/use-node-selection";
+import { useResolvedNode } from "@/components/apps/node-picker";
 import {
   Cpu,
   MemoryStick,
@@ -25,7 +25,7 @@ import {
   Loader2,
   Activity,
   Globe,
-} from 'lucide-react';
+} from "lucide-react";
 
 interface MetricsDashboardProps {
   appName: string;
@@ -41,13 +41,13 @@ function formatDuration(date: Date): string {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSeconds < 60) {
-    return 'less than a minute';
+    return "less than a minute";
   } else if (diffMinutes < 60) {
-    return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'}`;
+    return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"}`;
   } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours === 1 ? '' : 's'}`;
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"}`;
   } else {
-    return `${diffDays} day${diffDays === 1 ? '' : 's'}`;
+    return `${diffDays} day${diffDays === 1 ? "" : "s"}`;
   }
 }
 
@@ -60,7 +60,13 @@ interface MetricCardProps {
   percentage?: number;
 }
 
-function MetricCard({ title, value, subtitle, icon, percentage }: MetricCardProps) {
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon,
+  percentage,
+}: MetricCardProps) {
   return (
     <Card>
       <CardContent>
@@ -86,7 +92,10 @@ function MetricCard({ title, value, subtitle, icon, percentage }: MetricCardProp
   );
 }
 
-export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProps) {
+export function MetricsDashboard({
+  appName,
+  selectedNode,
+}: MetricsDashboardProps) {
   const { zelidauth } = useAuthStore();
 
   // Use unified node selection hook for locations and master detection
@@ -107,7 +116,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
   const nodesToQuery = useMemo(() => {
     const priorityNode = resolvedNode || masterNodeAddress;
     if (priorityNode) {
-      return [priorityNode, ...nodeIps.filter(ip => ip !== priorityNode)];
+      return [priorityNode, ...nodeIps.filter((ip) => ip !== priorityNode)];
     }
     return nodeIps;
   }, [resolvedNode, masterNodeAddress, nodeIps]);
@@ -120,10 +129,14 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
     refetch: refetchStats,
     isFetching: statsFetching,
   } = useQuery({
-    queryKey: ['appStats', appName, nodesToQuery.join(','), zelidauth],
+    queryKey: ["appStats", appName, nodesToQuery.join(","), zelidauth],
     queryFn: async () => {
       if (nodesToQuery.length === 0) return null;
-      const response = await getAppStatsFromNodes(nodesToQuery, appName, zelidauth || undefined);
+      const response = await getAppStatsFromNodes(
+        nodesToQuery,
+        appName,
+        zelidauth || undefined,
+      );
       return response;
     },
     enabled: nodesToQuery.length > 0,
@@ -138,7 +151,9 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
   const isLoading = nodesLoading;
   const stats = statsData;
   const hasStats = stats?.containers && stats.containers.length > 0;
-  const isStatsLoading = (statsLoading && !statsData) || (nodeIps.length === 0 && sortedLocations.length > 0);
+  const isStatsLoading =
+    (statsLoading && !statsData) ||
+    (nodeIps.length === 0 && sortedLocations.length > 0);
 
   const totalCpu = stats?.containers?.reduce((sum, c) => sum + c.cpu, 0) || 0;
   const totalMemoryUsage =
@@ -157,8 +172,10 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
 
   // Calculate percentages for bar charts
   const cpuPercent = Math.min(100, totalCpu);
-  const memoryPercent = totalMemoryLimit > 0 ? (totalMemoryUsage / totalMemoryLimit) * 100 : 0;
-  const diskPercent = totalDiskLimit > 0 ? (totalDiskUsage / totalDiskLimit) * 100 : 0;
+  const memoryPercent =
+    totalMemoryLimit > 0 ? (totalMemoryUsage / totalMemoryLimit) * 100 : 0;
+  const diskPercent =
+    totalDiskLimit > 0 ? (totalDiskUsage / totalDiskLimit) * 100 : 0;
 
   if (isLoading) {
     return (
@@ -188,7 +205,9 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
           onClick={() => refetchStats()}
           disabled={statsFetching}
         >
-          <RefreshCw className={`size-4 ${statsFetching ? 'animate-spin' : ''}`} />
+          <RefreshCw
+            className={`size-4 ${statsFetching ? "animate-spin" : ""}`}
+          />
           Refresh
         </Button>
       </div>
@@ -198,7 +217,9 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
           <CardContent className="py-6">
             <div className="flex items-center justify-center gap-2">
               <Loader2 className="size-4 animate-spin" />
-              <p className="text-sm text-muted-foreground">Loading metrics...</p>
+              <p className="text-sm text-muted-foreground">
+                Loading metrics...
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -209,7 +230,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
               Container stats not available. The app may still be starting up.
               <br />
               <span className="text-xs">
-                View detailed metrics on{' '}
+                View detailed metrics on{" "}
                 <a
                   href={`https://home.runonflux.io/apps/globalapps/${appName}`}
                   target="_blank"
@@ -270,28 +291,37 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
         <CardContent>
           {sortedLocations.length === 0 ? (
             <p className="text-muted-foreground text-sm">
-              No running instances found. The app may be stopped or still deploying.
+              No running instances found. The app may be stopped or still
+              deploying.
             </p>
           ) : (
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {sortedLocations.map((location, idx) => {
                 const nodeAddress = formatNodeAddress(location);
-                const isMaster = nodeAddress === masterNodeAddress;
-                const isStatsSource = statsNodeIp && location.ip.startsWith(statsNodeIp.split(':')[0]);
+                const isMaster =
+                  masterNodeAddress &&
+                  isSameNodeIp(nodeAddress, masterNodeAddress);
+                const isStatsSource =
+                  statsNodeIp &&
+                  location.ip.startsWith(statsNodeIp.split(":")[0]);
                 const isHighlighted = isMaster || isStatsSource;
                 return (
                   <div
                     key={idx}
-                    className={`flex items-center justify-between p-3 rounded-lg ${isHighlighted ? 'bg-primary/10' : 'bg-muted/30'
-                      }`}
+                    className={`flex items-center justify-between p-3 rounded-lg ${
+                      isHighlighted ? "bg-primary/10" : "bg-muted/30"
+                    }`}
                   >
                     <div className="flex items-center gap-3">
-                      <Server className={`size-4 ${isHighlighted ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <Server
+                        className={`size-4 ${isHighlighted ? "text-primary" : "text-muted-foreground"}`}
+                      />
                       <div>
                         <p className="font-medium text-sm">{location.ip}</p>
                         {location.runningSince && (
                           <p className="text-xs text-muted-foreground">
-                            Up for {formatDuration(new Date(location.runningSince))}
+                            Up for{" "}
+                            {formatDuration(new Date(location.runningSince))}
                           </p>
                         )}
                       </div>
@@ -327,10 +357,7 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
           <CardContent>
             <div className="space-y-4">
               {stats.containers.map((container, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-lg border space-y-3"
-                >
+                <div key={idx} className="p-4 rounded-lg border space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{container.name}</span>
                     <Badge>Running</Badge>
@@ -343,17 +370,21 @@ export function MetricsDashboard({ appName, selectedNode }: MetricsDashboardProp
                     <div>
                       <p className="text-muted-foreground">Memory</p>
                       <p className="font-medium">
-                        {formatBytes(container.memory.usage)} /{' '}
+                        {formatBytes(container.memory.usage)} /{" "}
                         {formatBytes(container.memory.limit)}
                       </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Network RX</p>
-                      <p className="font-medium">{formatBytes(container.network.rx_bytes)}</p>
+                      <p className="font-medium">
+                        {formatBytes(container.network.rx_bytes)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-muted-foreground">Network TX</p>
-                      <p className="font-medium">{formatBytes(container.network.tx_bytes)}</p>
+                      <p className="font-medium">
+                        {formatBytes(container.network.tx_bytes)}
+                      </p>
                     </div>
                   </div>
                 </div>

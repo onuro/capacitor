@@ -1,120 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import { detectMaster, findMasterInNodes } from "@/lib/flux-fdm";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-interface TryNodeResult {
-  success: boolean;
-  response?: NextResponse;
-  error?: string;
-}
-
 /**
- * Sleep helper for retry delays
+ * Download a file from a single node.
+ * Client-side handles retry/fallback logic.
  */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Try to download file from a single node
- */
-async function tryNode(
-  nodeIp: string,
-  headers: Record<string, string>,
-  appName: string,
-  component: string,
-  filePath: string,
-): Promise<TryNodeResult> {
-  try {
-    const hasPort = nodeIp.includes(":");
-    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
-
-    // Build the download URL - Flux uses /apps/downloadfile/:appname/:component/:file
-    const cleanPath = filePath.startsWith("/") ? filePath.slice(1) : filePath;
-    const endpoint = `/apps/downloadfile/${appName}/${component}/${encodeURIComponent(cleanPath)}`;
-    const nodeUrl = baseUrl + endpoint;
-
-    console.log(`[Download] Trying ${nodeIp}...`);
-
-    const response = await fetch(nodeUrl, {
-      method: "GET",
-      headers,
-      signal: AbortSignal.timeout(60000),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      console.log(
-        `[Download] ${nodeIp} returned ${response.status}: ${text.slice(0, 100)}`,
-      );
-      return {
-        success: false,
-        error: `Node ${nodeIp} returned ${response.status}`,
-      };
-    }
-
-    // Check if response is JSON (error) or raw file content
-    const contentType = response.headers.get("content-type") || "";
-
-    if (contentType.includes("application/json")) {
-      const data = await response.json();
-      // Check if this is a Flux API response (has status field) or raw JSON file content
-      if (data.status === "error") {
-        const errorMessage =
-          data.message || data.data?.message || "Failed to download file";
-        console.log(`[Download] ${nodeIp} returned error: ${errorMessage}`);
-        return { success: false, error: errorMessage };
-      }
-      // If it's a Flux API success response, return data.data
-      // Otherwise it's a raw JSON file - stringify it back
-      const isFluxResponse = typeof data.status === "string" && "data" in data;
-      console.log(`[Download] SUCCESS from ${nodeIp}`);
-      return {
-        success: true,
-        response: NextResponse.json({
-          status: "success",
-          data: isFluxResponse ? data.data : JSON.stringify(data, null, 2),
-          contentType: "application/json",
-          nodeIp,
-        }),
-      };
-    }
-
-    // Return raw file content as text
-    const content = await response.text();
-    console.log(`[Download] SUCCESS from ${nodeIp}`);
-    return {
-      success: true,
-      response: NextResponse.json({
-        status: "success",
-        data: content,
-        contentType: contentType || "text/plain",
-        nodeIp,
-      }),
-    };
-  } catch (error) {
-    console.log(
-      `[Download] ${nodeIp} failed:`,
-      error instanceof Error ? error.message : error,
-    );
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Connection failed",
-    };
-  }
-}
-
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const nodeIpParam = searchParams.get("nodeIp");
+  const nodeIp = searchParams.get("nodeIp");
   const appName = searchParams.get("appName");
   const component = searchParams.get("component");
   const filePath = searchParams.get("filePath");
   const zelidauth = request.headers.get("zelidauth");
 
-  if (!nodeIpParam || !appName || !component || !filePath) {
+  if (!nodeIp || !appName || !component || !filePath) {
     return NextResponse.json(
       { status: "error", message: "Missing required parameters" },
       { status: 400 },
@@ -127,12 +28,6 @@ export async function GET(request: NextRequest) {
       { status: 401 },
     );
   }
-
-  // Parse node IPs (support comma-separated list for fallback)
-  const nodeIps = nodeIpParam
-    .split(",")
-    .map((ip) => ip.trim())
-    .filter(Boolean);
 
   // Parse zelidauth and convert to JSON format for nodes
   const headers: Record<string, string> = {
@@ -159,72 +54,88 @@ export async function GET(request: NextRequest) {
     headers["zelidauth"] = zelidauth;
   }
 
-  // 1. Detect master node via FDM (primary) with HAProxy fallback
-  console.log(`[Download] Detecting master node for ${appName}...`);
-  const masterIp = await detectMaster(appName);
+  // Query single node
+  try {
+    const hasPort = nodeIp.includes(":");
+    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
 
-  // 2. Find the correct IP:port for master by matching against client-provided nodes
-  let masterNode: string | null = null;
-  if (masterIp) {
-    masterNode = findMasterInNodes(masterIp, nodeIps);
-    console.log(
-      `[Download] Master node detected: ${masterIp} -> ${masterNode}`,
-    );
-  } else {
-    console.log(`[Download] No master detected, using client-provided nodes`);
-  }
+    // Build the download URL - Flux uses /apps/downloadfile/:appname/:component/:file
+    const cleanPath = filePath.startsWith("/") ? filePath.slice(1) : filePath;
+    const endpoint = `/apps/downloadfile/${appName}/${component}/${encodeURIComponent(cleanPath)}`;
+    const nodeUrl = baseUrl + endpoint;
 
-  // 3. Reorder nodes: master first, then others
-  const orderedNodes = masterNode
-    ? [masterNode, ...nodeIps.filter((ip) => ip !== masterNode)]
-    : nodeIps;
+    console.log(`[Download] Querying ${nodeIp}...`);
 
-  let lastError = "";
+    const response = await fetch(nodeUrl, {
+      method: "GET",
+      headers,
+      signal: AbortSignal.timeout(60000),
+    });
 
-  // 4. If we have a master, try it with retries (3 attempts, 2s delay)
-  if (masterNode && orderedNodes.length > 0) {
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      console.log(`[Download] Master attempt ${attempt}/3 for ${masterNode}`);
-      const result = await tryNode(
-        masterNode,
-        headers,
-        appName,
-        component,
-        filePath,
+    if (!response.ok) {
+      const text = await response.text();
+      console.log(
+        `[Download] ${nodeIp} returned ${response.status}: ${text.slice(0, 100)}`,
       );
-
-      if (result.success && result.response) {
-        return result.response;
-      }
-
-      lastError = result.error || "Unknown error";
-
-      // Wait before retry (unless last attempt)
-      if (attempt < 3) {
-        console.log(`[Download] Retrying master in 2s...`);
-        await sleep(2000);
-      }
+      return NextResponse.json(
+        {
+          status: "error",
+          message: `Node returned ${response.status}`,
+          nodeIp,
+        },
+        { status: 502 },
+      );
     }
+
+    // Get response as text first to handle both JSON errors and raw file content
+    // Flux may return errors with HTTP 200 and inconsistent content-type headers
+    const contentType = response.headers.get("content-type") || "";
+    const content = await response.text();
+
+    // Always try to detect Flux API error responses (they return 200 with JSON error body)
+    try {
+      const parsed = JSON.parse(content);
+      if (parsed.status === "error") {
+        const errorMessage =
+          parsed.message || parsed.data?.message || "Failed to download file";
+        console.log(`[Download] ${nodeIp} returned error: ${errorMessage}`);
+        return NextResponse.json(
+          { status: "error", message: errorMessage, nodeIp },
+          { status: 502 },
+        );
+      }
+      // Valid JSON that's not an error - could be a JSON file or Flux success response
+      const isFluxResponse =
+        typeof parsed.status === "string" && "data" in parsed;
+      console.log(`[Download] SUCCESS from ${nodeIp}`);
+      return NextResponse.json({
+        status: "success",
+        data: isFluxResponse ? parsed.data : JSON.stringify(parsed, null, 2),
+        contentType: contentType || "application/json",
+        nodeIp,
+      });
+    } catch {
+      // Not JSON - return as raw text content (this is the expected case for most files)
+      console.log(`[Download] SUCCESS from ${nodeIp}`);
+      return NextResponse.json({
+        status: "success",
+        data: content,
+        contentType: contentType || "text/plain",
+        nodeIp,
+      });
+    }
+  } catch (error) {
     console.log(
-      `[Download] Master exhausted after 3 attempts, trying fallback nodes...`,
+      `[Download] ${nodeIp} failed:`,
+      error instanceof Error ? error.message : error,
+    );
+    return NextResponse.json(
+      {
+        status: "error",
+        message: error instanceof Error ? error.message : "Connection failed",
+        nodeIp,
+      },
+      { status: 502 },
     );
   }
-
-  // 5. Fall back to other nodes (one attempt each)
-  const fallbackNodes = masterNode ? orderedNodes.slice(1) : orderedNodes;
-  for (const nodeIp of fallbackNodes) {
-    const result = await tryNode(nodeIp, headers, appName, component, filePath);
-
-    if (result.success && result.response) {
-      return result.response;
-    }
-
-    lastError = result.error || "Unknown error";
-  }
-
-  // All nodes failed
-  return NextResponse.json(
-    { status: "error", message: `Failed to download file. ${lastError}` },
-    { status: 502 },
-  );
 }

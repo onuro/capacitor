@@ -1,9 +1,9 @@
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-import type { AppLocation } from "./api/flux-apps"
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+import type { AppLocation } from "./api/flux-apps";
 
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+  return twMerge(clsx(inputs));
 }
 
 /**
@@ -13,8 +13,18 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function formatNodeAddress(loc: AppLocation): string {
   // Check if IP already contains a port
-  if (loc.ip.includes(':')) {
+  if (loc.ip.includes(":")) {
     return loc.ip;
   }
   return loc.port ? `${loc.ip}:${loc.port}` : `${loc.ip}:16127`;
+}
+
+/**
+ * Compare two node addresses by IP only, ignoring port.
+ * Used for master node detection where FDM returns IP:16127 but actual
+ * instances may run on different ports (16127, 16137, 16157, etc.)
+ */
+export function isSameNodeIp(ip1: string, ip2: string): boolean {
+  const extractIp = (addr: string) => addr.split(":")[0];
+  return extractIp(ip1) === extractIp(ip2);
 }

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getAppLocations, type AppLocation } from '@/lib/api/flux-apps';
-import { getMasterNode } from '@/lib/api/flux-node-detect';
-import { formatNodeAddress } from '@/lib/utils';
+import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getAppLocations, type AppLocation } from "@/lib/api/flux-apps";
+import { getMasterNode } from "@/lib/api/flux-node-detect";
+import { formatNodeAddress, isSameNodeIp } from "@/lib/utils";
 
 export interface UseNodeSelectionOptions {
   appName: string;
@@ -35,11 +35,11 @@ export function useNodeSelection({
   appName,
   autoSelectMaster = true,
 }: UseNodeSelectionOptions): UseNodeSelectionResult {
-  const [selectedNode, setSelectedNode] = useState<string>('');
+  const [selectedNode, setSelectedNode] = useState<string>("");
 
   // Fetch app locations
   const { data: locationsData, isLoading: locationsLoading } = useQuery({
-    queryKey: ['appLocations', appName],
+    queryKey: ["appLocations", appName],
     queryFn: () => getAppLocations(appName),
     staleTime: 30000,
   });
@@ -61,7 +61,7 @@ export function useNodeSelection({
 
   // Get master node from HAProxy stats (returns IP:port with correct Flux API port)
   const { data: masterNodeData, isLoading: masterLoading } = useQuery({
-    queryKey: ['masterNode', appName],
+    queryKey: ["masterNode", appName],
     queryFn: () => getMasterNode(appName),
     enabled: !!appName,
     staleTime: 30000,
@@ -81,13 +81,13 @@ export function useNodeSelection({
     }
   }, [sortedLocations, selectedNode, masterNodeAddress, autoSelectMaster]);
 
-  // Get label for a node
+  // Get label for a node - compare by IP only since ports may differ
   const getNodeLabel = (loc: AppLocation, _index: number): string => {
     const address = formatNodeAddress(loc);
-    if (address === masterNodeAddress) {
-      return '(master)';
+    if (masterNodeAddress && isSameNodeIp(address, masterNodeAddress)) {
+      return "(master)";
     }
-    return '';
+    return "";
   };
 
   return {

@@ -1,7 +1,7 @@
-import apiClient from './client';
+import apiClient from "./client";
 
 export interface FluxApiResponse<T> {
-  status: 'success' | 'error';
+  status: "success" | "error";
   data?: T;
   message?: string;
 }
@@ -20,32 +20,29 @@ export interface DirectoryListing {
 }
 
 /**
- * List files in app storage (via proxy to handle CORS and node selection)
+ * List files in app storage (via proxy to handle CORS)
  * @param zelidauth - Auth token
  * @param appName - Name of the application
  * @param component - Component name (for compose apps)
- * @param nodeIps - Node IP(s) to query (string or array - will try each until one succeeds)
+ * @param nodeIp - Node IP to query
  * @param path - Path within the app storage (default: root)
  */
 export async function listFiles(
   zelidauth: string,
   appName: string,
   component: string,
-  nodeIps: string | string[],
-  path: string = '/'
+  nodeIp: string,
+  path: string = "/",
 ): Promise<FluxApiResponse<DirectoryListing>> {
-  // Support both single IP and array of IPs for fallback
-  const nodeIpParam = Array.isArray(nodeIps) ? nodeIps.join(',') : nodeIps;
-
   const params = new URLSearchParams({
-    nodeIp: nodeIpParam,
+    nodeIp,
     appName,
     component,
     folder: path,
   });
 
   const response = await fetch(`/api/flux/files?${params.toString()}`, {
-    method: 'GET',
+    method: "GET",
     headers: { zelidauth },
     signal: AbortSignal.timeout(30000),
   });
@@ -66,7 +63,7 @@ export async function downloadFile(
   appName: string,
   component: string,
   nodeIp: string,
-  filePath: string
+  filePath: string,
 ): Promise<FluxApiResponse<string>> {
   const params = new URLSearchParams({
     nodeIp,
@@ -75,11 +72,14 @@ export async function downloadFile(
     filePath,
   });
 
-  const response = await fetch(`/api/flux/files/download?${params.toString()}`, {
-    method: 'GET',
-    headers: { zelidauth },
-    signal: AbortSignal.timeout(60000),
-  });
+  const response = await fetch(
+    `/api/flux/files/download?${params.toString()}`,
+    {
+      method: "GET",
+      headers: { zelidauth },
+      signal: AbortSignal.timeout(60000),
+    },
+  );
 
   return response.json();
 }
@@ -99,12 +99,12 @@ export async function saveFile(
   component: string,
   nodeIp: string,
   filePath: string,
-  content: string
+  content: string,
 ): Promise<FluxApiResponse<string>> {
-  const response = await fetch('/api/flux/files/upload', {
-    method: 'POST',
+  const response = await fetch("/api/flux/files/upload", {
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       zelidauth,
     },
     body: JSON.stringify({
@@ -130,11 +130,11 @@ export async function uploadFile(
   zelidauth: string,
   appName: string,
   filePath: string,
-  file: File
+  file: File,
 ): Promise<FluxApiResponse<string>> {
   const formData = new FormData();
-  formData.append('file', file);
-  formData.append('path', filePath);
+  formData.append("file", file);
+  formData.append("path", filePath);
 
   const response = await apiClient.post<FluxApiResponse<string>>(
     `/apps/appfileupload/${appName}`,
@@ -142,10 +142,10 @@ export async function uploadFile(
     {
       headers: {
         zelidauth,
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
       timeout: 120000,
-    }
+    },
   );
   return response.data;
 }
@@ -165,7 +165,7 @@ export async function uploadBinaryFile(
   component: string,
   nodeIp: string,
   folder: string,
-  file: File
+  file: File,
 ): Promise<FluxApiResponse<string>> {
   const formData = new FormData();
   formData.append(file.name, file);
@@ -177,14 +177,17 @@ export async function uploadBinaryFile(
     folder,
   });
 
-  const response = await fetch(`/api/flux/files/upload-binary?${params.toString()}`, {
-    method: 'POST',
-    headers: {
-      zelidauth,
+  const response = await fetch(
+    `/api/flux/files/upload-binary?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        zelidauth,
+      },
+      body: formData,
+      signal: AbortSignal.timeout(120000),
     },
-    body: formData,
-    signal: AbortSignal.timeout(120000),
-  });
+  );
 
   return response.json();
 }
@@ -203,12 +206,12 @@ export async function deleteFile(
   appName: string,
   component: string,
   nodeIp: string,
-  filePath: string
+  filePath: string,
 ): Promise<FluxApiResponse<string>> {
-  const response = await fetch('/api/flux/files/delete', {
-    method: 'DELETE',
+  const response = await fetch("/api/flux/files/delete", {
+    method: "DELETE",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       zelidauth,
     },
     body: JSON.stringify({
@@ -231,22 +234,28 @@ export async function getFileContent(
   appName: string,
   component: string,
   nodeIp: string,
-  filePath: string
+  filePath: string,
 ): Promise<string> {
-  const response = await downloadFile(zelidauth, appName, component, nodeIp, filePath);
-  if (response.status === 'success' && response.data) {
+  const response = await downloadFile(
+    zelidauth,
+    appName,
+    component,
+    nodeIp,
+    filePath,
+  );
+  if (response.status === "success" && response.data) {
     return response.data;
   }
-  throw new Error(response.message || 'Failed to get file content');
+  throw new Error(response.message || "Failed to get file content");
 }
 
 /**
  * Format file size to human readable string
  */
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) return "0 B";
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
@@ -255,8 +264,8 @@ export function formatFileSize(bytes: number): string {
  * Get file extension
  */
 export function getFileExtension(filename: string): string {
-  const parts = filename.split('.');
-  return parts.length > 1 ? parts.pop()?.toLowerCase() || '' : '';
+  const parts = filename.split(".");
+  return parts.length > 1 ? parts.pop()?.toLowerCase() || "" : "";
 }
 
 /**
@@ -264,11 +273,50 @@ export function getFileExtension(filename: string): string {
  */
 export function isTextFile(filename: string): boolean {
   const textExtensions = [
-    'txt', 'md', 'json', 'yaml', 'yml', 'xml', 'html', 'css', 'js', 'ts',
-    'jsx', 'tsx', 'py', 'rb', 'go', 'rs', 'java', 'c', 'cpp', 'h', 'hpp',
-    'sh', 'bash', 'zsh', 'env', 'log', 'conf', 'cfg', 'ini', 'toml',
-    'php', 'htaccess', 'sql', 'vue', 'svelte', 'astro', 'prisma', 'graphql',
-    'dockerfile', 'makefile', 'gitignore', 'npmrc', 'nvmrc', 'editorconfig'
+    "txt",
+    "md",
+    "json",
+    "yaml",
+    "yml",
+    "xml",
+    "html",
+    "css",
+    "js",
+    "ts",
+    "jsx",
+    "tsx",
+    "py",
+    "rb",
+    "go",
+    "rs",
+    "java",
+    "c",
+    "cpp",
+    "h",
+    "hpp",
+    "sh",
+    "bash",
+    "zsh",
+    "env",
+    "log",
+    "conf",
+    "cfg",
+    "ini",
+    "toml",
+    "php",
+    "htaccess",
+    "sql",
+    "vue",
+    "svelte",
+    "astro",
+    "prisma",
+    "graphql",
+    "dockerfile",
+    "makefile",
+    "gitignore",
+    "npmrc",
+    "nvmrc",
+    "editorconfig",
   ];
   return textExtensions.includes(getFileExtension(filename));
 }
@@ -277,49 +325,49 @@ export function isTextFile(filename: string): boolean {
  * Get appropriate icon for file type
  */
 export function getFileIcon(file: FileInfo): string {
-  if (file.isDirectory) return 'folder';
+  if (file.isDirectory) return "folder";
 
   const ext = getFileExtension(file.name);
   const iconMap: Record<string, string> = {
     // Documents
-    pdf: 'file-text',
-    doc: 'file-text',
-    docx: 'file-text',
-    txt: 'file-text',
-    md: 'file-text',
+    pdf: "file-text",
+    doc: "file-text",
+    docx: "file-text",
+    txt: "file-text",
+    md: "file-text",
 
     // Code
-    js: 'file-code',
-    ts: 'file-code',
-    jsx: 'file-code',
-    tsx: 'file-code',
-    py: 'file-code',
-    go: 'file-code',
-    rs: 'file-code',
+    js: "file-code",
+    ts: "file-code",
+    jsx: "file-code",
+    tsx: "file-code",
+    py: "file-code",
+    go: "file-code",
+    rs: "file-code",
 
     // Data
-    json: 'file-json',
-    yaml: 'file-json',
-    yml: 'file-json',
-    xml: 'file-code',
+    json: "file-json",
+    yaml: "file-json",
+    yml: "file-json",
+    xml: "file-code",
 
     // Images
-    png: 'image',
-    jpg: 'image',
-    jpeg: 'image',
-    gif: 'image',
-    svg: 'image',
+    png: "image",
+    jpg: "image",
+    jpeg: "image",
+    gif: "image",
+    svg: "image",
 
     // Archives
-    zip: 'file-archive',
-    tar: 'file-archive',
-    gz: 'file-archive',
+    zip: "file-archive",
+    tar: "file-archive",
+    gz: "file-archive",
 
     // Config
-    env: 'settings',
-    conf: 'settings',
-    cfg: 'settings',
+    env: "settings",
+    conf: "settings",
+    cfg: "settings",
   };
 
-  return iconMap[ext] || 'file';
+  return iconMap[ext] || "file";
 }

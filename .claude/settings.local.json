@@ -17,7 +17,9 @@
       "Bash(grep:*)",
       "Bash(npx tsc:*)",
       "Bash(npx eslint:*)",
-      "mcp__acp__Edit"
+      "mcp__acp__Edit",
+      "mcp__acp__Bash",
+      "mcp__acp__Write"
     ]
   }
 }

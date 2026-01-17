@@ -1,4 +1,4 @@
-'use client';
+"use client";
 
 import {
   Select,
@@ -6,11 +6,10 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Server } from 'lucide-react';
-import { useNodeSelection } from '@/hooks/use-node-selection';
-import { formatNodeAddress } from '@/lib/utils';
-import { cn } from '@/lib/utils';
+} from "@/components/ui/select";
+import { Server } from "lucide-react";
+import { useNodeSelection } from "@/hooks/use-node-selection";
+import { formatNodeAddress, isSameNodeIp, cn } from "@/lib/utils";
 
 export interface NodePickerProps {
   /** App name for fetching locations and master node */
@@ -20,7 +19,7 @@ export interface NodePickerProps {
   /** Controlled onChange handler */
   onChange: (value: string) => void;
   /** Size variant */
-  size?: 'sm' | 'default';
+  size?: "sm" | "default";
   /** Additional className */
   className?: string;
   /** Disabled state */
@@ -28,8 +27,8 @@ export interface NodePickerProps {
 }
 
 const sizeClasses = {
-  sm: 'h-8 text-xs',
-  default: 'h-9 text-sm',
+  sm: "h-8 text-xs",
+  default: "h-9 text-sm",
 };
 
 /**
@@ -40,16 +39,12 @@ export function NodePicker({
   appName,
   value,
   onChange,
-  size = 'default',
+  size = "default",
   className,
   disabled = false,
 }: NodePickerProps) {
-  const {
-    sortedLocations,
-    masterNodeAddress,
-    isLoading,
-    getNodeLabel,
-  } = useNodeSelection({ appName, autoSelectMaster: false });
+  const { sortedLocations, masterNodeAddress, isLoading, getNodeLabel } =
+    useNodeSelection({ appName, autoSelectMaster: false });
 
   // Don't render if no locations
   if (!isLoading && sortedLocations.length === 0) {
@@ -62,13 +57,13 @@ export function NodePicker({
       onValueChange={onChange}
       disabled={disabled || isLoading}
     >
-      <SelectTrigger className={cn('w-[200px]', sizeClasses[size], className)}>
+      <SelectTrigger className={cn("w-[200px]", sizeClasses[size], className)}>
         <Server className="size-3.5 mr-1.5" />
-        <SelectValue placeholder={isLoading ? 'Loading...' : 'Select node'} />
+        <SelectValue placeholder={isLoading ? "Loading..." : "Select node"} />
       </SelectTrigger>
       <SelectContent align="end">
         <SelectItem value="auto">
-          Auto {masterNodeAddress ? '(master)' : '(first available)'}
+          Auto {masterNodeAddress ? "(master)" : "(first available)"}
         </SelectItem>
         {sortedLocations.map((loc, idx) => {
           const ipPort = formatNodeAddress(loc);
@@ -94,11 +89,22 @@ export function useResolvedNode(appName: string, selectedNode: string) {
     autoSelectMaster: false,
   });
 
-  if (selectedNode === 'auto') {
-    // Prefer master from HAProxy, fallback to first sorted location
-    if (masterNodeAddress) {
-      return { resolvedNode: masterNodeAddress, isMaster: true, isLoading };
+  if (selectedNode === "auto") {
+    // Prefer master node, but use the correct port from locations
+    // (masterNodeAddress from FDM may have wrong port due to toFluxApiPort)
+    if (masterNodeAddress && sortedLocations.length > 0) {
+      const masterFromLocations = sortedLocations.find((loc) =>
+        isSameNodeIp(formatNodeAddress(loc), masterNodeAddress),
+      );
+      if (masterFromLocations) {
+        return {
+          resolvedNode: formatNodeAddress(masterFromLocations),
+          isMaster: true,
+          isLoading,
+        };
+      }
     }
+    // Fallback to first sorted location
     if (sortedLocations.length > 0) {
       return {
         resolvedNode: formatNodeAddress(sortedLocations[0]),
@@ -111,7 +117,9 @@ export function useResolvedNode(appName: string, selectedNode: string) {
 
   return {
     resolvedNode: selectedNode,
-    isMaster: selectedNode === masterNodeAddress,
+    isMaster: masterNodeAddress
+      ? isSameNodeIp(selectedNode, masterNodeAddress)
+      : false,
     isLoading,
   };
 }
