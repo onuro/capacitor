@@ -37,6 +37,7 @@ import { getAppSpecification } from "@/lib/api/flux-apps";
 import { formatNodeAddress } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth";
 import { useNodeSelection } from "@/hooks/use-node-selection";
+import { useResolvedNode } from "@/components/apps/node-picker";
 import { useFileOperations } from "@/hooks/use-file-operations";
 import { toast } from "sonner";
 import {
@@ -257,6 +258,7 @@ function getHighlighter(): Promise<Highlighter> {
 
 interface FileBrowserProps {
   appName: string;
+  selectedNode: string;
 }
 
 function getFileIcon(file: FileInfo) {
@@ -290,7 +292,7 @@ function getFileIcon(file: FileInfo) {
   return <File className="size-4 text-gray-400" />;
 }
 
-export function FileBrowser({ appName }: FileBrowserProps) {
+export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   const [currentPath, setCurrentPath] = useState("/");
   const [editingFile, setEditingFile] = useState<FileInfo | null>(null);
   const [editContent, setEditContent] = useState<string>("");
@@ -312,8 +314,16 @@ export function FileBrowser({ appName }: FileBrowserProps) {
     autoSelectMaster: false,
   });
 
-  // Build node IPs list
-  const allNodeIps = sortedLocations.map((l) => formatNodeAddress(l));
+  // Resolve "auto" to actual node
+  const { resolvedNode } = useResolvedNode(appName, selectedNode);
+
+  // Build node IPs list - if a specific node is selected, use only that node
+  const allNodeIps =
+    selectedNode === "auto"
+      ? sortedLocations.map((l) => formatNodeAddress(l))
+      : resolvedNode
+        ? [resolvedNode]
+        : [];
   const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
