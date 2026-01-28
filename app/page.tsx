@@ -27,10 +27,6 @@ export default function Home() {
             <Zap className="size-4" />
             Powered by FluxCloud
           </div>
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-medium text-primary mb-6">
-            <Zap className="size-4" />
-            Powered by FluxCloud
-          </div>
 
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl mb-6">
             Deploy Your Apps on{" "}

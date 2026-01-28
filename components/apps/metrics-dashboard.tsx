@@ -1,11 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UsageBarChart } from "@/components/ui/usage-bar-chart";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   getAppStatsFromNodes,
   formatBytes,
@@ -97,6 +104,7 @@ export function MetricsDashboard({
   selectedNode,
 }: MetricsDashboardProps) {
   const { zelidauth } = useAuthStore();
+  const [refreshInterval, setRefreshInterval] = useState<number>(5000);
 
   // Use unified node selection hook for locations and master detection
   const {
@@ -129,7 +137,7 @@ export function MetricsDashboard({
     refetch: refetchStats,
     isFetching: statsFetching,
   } = useQuery({
-    queryKey: ["appStats", appName, nodesToQuery.join(","), zelidauth],
+    queryKey: ["appStats", appName, [...nodesToQuery].sort().join(",")],
     queryFn: async () => {
       if (nodesToQuery.length === 0) return null;
       const response = await getAppStatsFromNodes(
@@ -140,8 +148,8 @@ export function MetricsDashboard({
       return response;
     },
     enabled: nodesToQuery.length > 0,
-    refetchInterval: 3000,
-    staleTime: 10000,
+    refetchInterval: refreshInterval,
+    staleTime: refreshInterval,
     retry: 1,
   });
 
@@ -199,17 +207,31 @@ export function MetricsDashboard({
             </p>
           )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => refetchStats()}
-          disabled={statsFetching}
-        >
-          <RefreshCw
-            className={`size-4 ${statsFetching ? "animate-spin" : ""}`}
-          />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select
+            value={refreshInterval.toString()}
+            onValueChange={(val) => setRefreshInterval(Number(val))}
+          >
+            <SelectTrigger className="w-24 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5000">5s</SelectItem>
+              <SelectItem value="10000">10s</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetchStats()}
+            disabled={statsFetching}
+          >
+            <RefreshCw
+              className={`size-4 ${statsFetching ? "animate-spin" : ""}`}
+            />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {isStatsLoading ? (

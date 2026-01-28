@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useAccount, useConnect, useDisconnect, useSignMessage } from 'wagmi';
-import Image from 'next/image';
-import { Button } from '@/components/ui/button';
+import { useState } from "react";
+import { useAccount, useConnect, useDisconnect, useSignMessage } from "wagmi";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,18 +11,20 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog';
-import { useAuthStore } from '@/stores/auth';
-import { isSSPAvailable, signWithSSP } from '@/lib/wallet/ssp';
-import { isZelcoreAvailable, signWithZelcore } from '@/lib/wallet/zelcore';
-import { Loader2, Wallet, LogOut, ChevronDown } from 'lucide-react';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { useAuthStore } from "@/stores/auth";
+import { isSSPAvailable, signWithSSP } from "@/lib/wallet/ssp";
+import { isZelcoreAvailable, signWithZelcore } from "@/lib/wallet/zelcore";
+import { Loader2, Wallet, LogOut, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
 
-type WalletOption = 'metamask' | 'walletconnect' | 'ssp' | 'zelcore';
+type WalletOption = "metamask" | "walletconnect" | "ssp" | "zelcore";
 
 export function ConnectButton() {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedWallet, setSelectedWallet] = useState<WalletOption | null>(null);
+  const [selectedWallet, setSelectedWallet] = useState<WalletOption | null>(
+    null,
+  );
   const [isConnecting, setIsConnecting] = useState(false);
 
   const { isConnected } = useAccount();
@@ -52,13 +54,18 @@ export function ConnectButton() {
       let walletAddress: string;
       let signature: string;
 
-      if (wallet === 'metamask' || wallet === 'walletconnect') {
+      if (wallet === "metamask" || wallet === "walletconnect") {
         // Find the appropriate connector
         const connector = connectors.find((c) => {
-          if (wallet === 'metamask') {
-            return c.id === 'injected' || c.name.toLowerCase().includes('metamask');
+          if (wallet === "metamask") {
+            return (
+              c.id === "injected" || c.name.toLowerCase().includes("metamask")
+            );
           }
-          return c.id === 'walletConnect' || c.name.toLowerCase().includes('walletconnect');
+          return (
+            c.id === "walletConnect" ||
+            c.name.toLowerCase().includes("walletconnect")
+          );
         });
 
         if (!connector) {
@@ -71,45 +78,52 @@ export function ConnectButton() {
 
         // Sign the login phrase
         signature = await signMessageAsync({ message: loginPhrase });
-      } else if (wallet === 'ssp') {
+      } else if (wallet === "ssp") {
         if (!isSSPAvailable()) {
-          throw new Error('SSP Wallet is not installed');
+          throw new Error("SSP Wallet is not installed");
         }
 
         const result = await signWithSSP(loginPhrase);
         walletAddress = result.address;
         signature = result.signature;
-      } else if (wallet === 'zelcore') {
+      } else if (wallet === "zelcore") {
         if (!isZelcoreAvailable()) {
-          throw new Error('Zelcore wallet is not available.');
+          throw new Error("Zelcore wallet is not available.");
         }
 
-        toast.info('Please sign the message in your Zelcore app', {
+        toast.info("Please sign the message in your Zelcore app", {
           duration: 10000,
         });
 
-        const result = await signWithZelcore(loginPhrase, '');
+        const result = await signWithZelcore(loginPhrase, "");
         if (!result) {
-          throw new Error('Zelcore signing was cancelled or failed');
+          throw new Error("Zelcore signing was cancelled or failed");
         }
         if (!result.address) {
-          throw new Error('Zelcore did not return a valid address');
+          throw new Error("Zelcore did not return a valid address");
         }
         walletAddress = result.address;
         signature = result.signature;
       } else {
-        throw new Error('Unknown wallet type');
+        throw new Error("Unknown wallet type");
       }
 
       // Login with the API
-      console.log('[ConnectButton] Attempting login with:', { walletAddress, signature, loginPhrase, wallet });
+      console.log("[ConnectButton] Attempting login with:", {
+        walletAddress,
+        signature,
+        loginPhrase,
+        wallet,
+      });
       await login(walletAddress, signature, loginPhrase, wallet);
       setIsOpen(false);
-      toast.success('Successfully connected wallet');
+      toast.success("Successfully connected wallet");
     } catch (err) {
-      console.error('Wallet connection error:', err);
+      console.error("Wallet connection error:", err);
       // Error is already set in the store by login/fetchLoginPhrase
-      toast.error(err instanceof Error ? err.message : 'Failed to connect wallet');
+      toast.error(
+        err instanceof Error ? err.message : "Failed to connect wallet",
+      );
     } finally {
       setIsConnecting(false);
       setSelectedWallet(null);
@@ -123,7 +137,7 @@ export function ConnectButton() {
       }
       logout();
     } catch (err) {
-      console.error('Disconnect error:', err);
+      console.error("Disconnect error:", err);
     }
   };
 
@@ -180,10 +194,10 @@ export function ConnectButton() {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 h-14"
-            onClick={() => handleWalletConnect('metamask')}
+            onClick={() => handleWalletConnect("metamask")}
             disabled={isConnecting}
           >
-            {isConnecting && selectedWallet === 'metamask' ? (
+            {isConnecting && selectedWallet === "metamask" ? (
               <Loader2 className="size-6 animate-spin" />
             ) : (
               <Image
@@ -206,19 +220,25 @@ export function ConnectButton() {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 h-14"
-            onClick={() => handleWalletConnect('walletconnect')}
+            onClick={() => handleWalletConnect("walletconnect")}
             disabled={isConnecting}
           >
-            {isConnecting && selectedWallet === 'walletconnect' ? (
+            {isConnecting && selectedWallet === "walletconnect" ? (
               <Loader2 className="size-6 animate-spin" />
             ) : (
-              <Image
-                src="https://avatars.githubusercontent.com/u/37784886"
-                alt="WalletConnect"
-                width={24}
-                height={24}
-                className="size-6 rounded"
-              />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                height="332"
+                viewBox="0 0 480 332"
+                width="480"
+                className="size-6 text-primary"
+              >
+                <path
+                  d="m126.613 93.9842c62.622-61.3123 164.152-61.3123 226.775 0l7.536 7.3788c3.131 3.066 3.131 8.036 0 11.102l-25.781 25.242c-1.566 1.533-4.104 1.533-5.67 0l-10.371-10.154c-43.687-42.7734-114.517-42.7734-158.204 0l-11.107 10.874c-1.565 1.533-4.103 1.533-5.669 0l-25.781-25.242c-3.132-3.066-3.132-8.036 0-11.102zm280.093 52.2038 22.946 22.465c3.131 3.066 3.131 8.036 0 11.102l-103.463 101.301c-3.131 3.065-8.208 3.065-11.339 0l-73.432-71.896c-.783-.767-2.052-.767-2.835 0l-73.43 71.896c-3.131 3.065-8.208 3.065-11.339 0l-103.4657-101.302c-3.1311-3.066-3.1311-8.036 0-11.102l22.9456-22.466c3.1311-3.065 8.2077-3.065 11.3388 0l73.4333 71.897c.782.767 2.051.767 2.834 0l73.429-71.897c3.131-3.065 8.208-3.065 11.339 0l73.433 71.897c.783.767 2.052.767 2.835 0l73.431-71.895c3.132-3.066 8.208-3.066 11.339 0z"
+                  fill="currentColor"
+                />
+              </svg>
             )}
             <div className="flex flex-col items-start">
               <span className="font-medium">WalletConnect</span>
@@ -232,10 +252,10 @@ export function ConnectButton() {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 h-14"
-            onClick={() => handleWalletConnect('ssp')}
+            onClick={() => handleWalletConnect("ssp")}
             disabled={isConnecting || !isSSPAvailable()}
           >
-            {isConnecting && selectedWallet === 'ssp' ? (
+            {isConnecting && selectedWallet === "ssp" ? (
               <Loader2 className="size-6 animate-spin" />
             ) : (
               <div className="size-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
@@ -245,7 +265,7 @@ export function ConnectButton() {
             <div className="flex flex-col items-start">
               <span className="font-medium">SSP Wallet</span>
               <span className="text-xs text-muted-foreground">
-                {isSSPAvailable() ? 'Browser extension' : 'Not installed'}
+                {isSSPAvailable() ? "Browser extension" : "Not installed"}
               </span>
             </div>
           </Button>
@@ -254,43 +274,118 @@ export function ConnectButton() {
           <Button
             variant="outline"
             className="w-full justify-start gap-3 h-14"
-            onClick={() => handleWalletConnect('zelcore')}
+            onClick={() => handleWalletConnect("zelcore")}
             disabled={isConnecting}
           >
-            {isConnecting && selectedWallet === 'zelcore' ? (
+            {isConnecting && selectedWallet === "zelcore" ? (
               <Loader2 className="size-6 animate-spin" />
             ) : (
-              <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" className="size-7 shrink-0">
-                <path d="M19.9005 39.8011C30.8913 39.8011 39.8011 30.8913 39.8011 19.9005C39.8011 8.90977 30.8913 0 19.9005 0C8.90977 0 0 8.90977 0 19.9005C0 30.8913 8.90977 39.8011 19.9005 39.8011Z" fill="#1B63EF" />
-                <path d="M18.8432 20.9422L19.2291 20.7195C19.5815 20.5159 20.1532 20.5159 20.5056 20.7195L20.8914 20.9422L19.8673 21.5335L18.8432 20.9422Z" fill="white" />
-                <path d="M18.8471 20.9444L19.8712 21.5357V30.5231L18.8471 29.9318V20.9444Z" fill="white" />
-                <path d="M19.8403 21.5391L20.8644 20.9479V29.9353L19.8403 30.5265V21.5391Z" fill="white" />
-                <path d="M19.8874 30.4974L25.008 27.5411V29.1691C25.008 29.5761 24.7221 30.0711 24.3697 30.2747L19.8874 32.8625V30.4974Z" fill="white" />
-                <path d="M14.779 27.5411L19.8995 30.4974V32.8625L15.4173 30.2747C15.0648 30.0711 14.779 29.5761 14.779 29.1691V27.5411Z" fill="white" />
-                <path d="M20.5496 17.9632L21.5737 18.5545V19.737L21.1879 19.5143C20.8353 19.3107 20.5496 18.8157 20.5496 18.4087V17.9632Z" fill="white" />
-                <path d="M20.5496 17.9629L27.7184 13.824L28.7425 14.4153L21.5737 18.5542L20.5496 17.9629Z" fill="white" />
-                <path d="M23.5293 11.4587L24.9391 10.6447C25.2918 10.4412 25.8632 10.4412 26.2158 10.6447L30.6981 13.2326L28.6498 14.4151L23.5293 11.4587Z" fill="white" />
-                <path d="M21.5428 18.5529L28.7116 14.4141V15.5966L21.5428 19.7355V18.5529Z" fill="white" />
-                <path d="M28.6383 14.3915L30.6866 13.2089V18.3845C30.6866 18.7915 30.4007 19.2865 30.0483 19.4901L28.6383 20.3041V14.3915Z" fill="white" />
-                <path d="M9.10252 13.1855L13.5848 10.5976C13.9373 10.3941 14.5088 10.3941 14.8614 10.5976L16.2712 11.4116L11.1507 14.368L9.10252 13.1855Z" fill="white" />
-                <path d="M18.2791 18.4834L19.3032 17.8921V18.3376C19.3032 18.7446 19.0175 19.2396 18.6649 19.4432L18.2791 19.6659V18.4834Z" fill="white" />
-                <path d="M11.1366 14.3449L18.3054 18.4839V19.6664L11.1366 15.5274V14.3449Z" fill="white" />
-                <path d="M9.10252 13.1618L11.1507 14.3444V20.2571L9.74082 19.4431C9.3883 19.2395 9.10252 18.7445 9.10252 18.3375V13.1618Z" fill="white" />
-                <path d="M11.1684 14.3861C11.1508 14.3759 11.1508 14.3594 11.1684 14.3493L12.1287 13.7948C12.1464 13.7847 12.1749 13.7847 12.1926 13.7948L19.2975 17.8969C19.3152 17.9071 19.3152 17.9235 19.2975 17.9337L18.3372 18.4881C18.3196 18.4984 18.2911 18.4984 18.2734 18.4881L11.1684 14.3861Z" fill="white" />
-                <path d="M28.6383 21.467C28.6383 21.06 28.924 20.565 29.2765 20.3615L30.6864 19.5475V24.2777L28.6383 25.4602V21.467Z" fill="white" />
-                <path d="M25.5634 27.9487C25.5634 27.5415 25.8491 27.0467 26.2017 26.8431L30.6838 24.2553V25.8833C30.6838 26.2903 30.3981 26.7853 30.0456 26.9889L25.5634 29.5767V27.9487Z" fill="white" />
-                <path d="M9.10252 24.2773L13.5848 26.8651C13.9373 27.0686 14.2231 27.5636 14.2231 27.9707V29.5987L9.74082 27.0109C9.3883 26.8073 9.10252 26.3124 9.10252 25.9053V24.2773Z" fill="white" />
-                <path d="M9.10252 19.5475L10.5124 20.3615C10.8649 20.5651 11.1507 21.0601 11.1507 21.4671V25.4602L9.10252 24.2777V19.5475Z" fill="white" />
-                <path d="M14.6843 9.94493L17.9614 8.05287L20.0096 9.23541L17.3708 10.7589C17.0184 10.9625 16.4467 10.9625 16.0942 10.7589L14.6843 9.94493Z" fill="white" />
-                <path d="M17.8063 8.14792L19.2161 7.33391C19.5687 7.13039 20.1403 7.13039 20.4928 7.33391L25.1798 10.04L23.7699 10.854C23.4175 11.0575 22.8459 11.0575 22.4932 10.854L17.8063 8.14792Z" fill="white" />
+              <svg
+                viewBox="0 0 40 40"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                className="size-7 shrink-0"
+              >
+                <path
+                  d="M19.9005 39.8011C30.8913 39.8011 39.8011 30.8913 39.8011 19.9005C39.8011 8.90977 30.8913 0 19.9005 0C8.90977 0 0 8.90977 0 19.9005C0 30.8913 8.90977 39.8011 19.9005 39.8011Z"
+                  fill="#1B63EF"
+                />
+                <path
+                  d="M18.8432 20.9422L19.2291 20.7195C19.5815 20.5159 20.1532 20.5159 20.5056 20.7195L20.8914 20.9422L19.8673 21.5335L18.8432 20.9422Z"
+                  fill="white"
+                />
+                <path
+                  d="M18.8471 20.9444L19.8712 21.5357V30.5231L18.8471 29.9318V20.9444Z"
+                  fill="white"
+                />
+                <path
+                  d="M19.8403 21.5391L20.8644 20.9479V29.9353L19.8403 30.5265V21.5391Z"
+                  fill="white"
+                />
+                <path
+                  d="M19.8874 30.4974L25.008 27.5411V29.1691C25.008 29.5761 24.7221 30.0711 24.3697 30.2747L19.8874 32.8625V30.4974Z"
+                  fill="white"
+                />
+                <path
+                  d="M14.779 27.5411L19.8995 30.4974V32.8625L15.4173 30.2747C15.0648 30.0711 14.779 29.5761 14.779 29.1691V27.5411Z"
+                  fill="white"
+                />
+                <path
+                  d="M20.5496 17.9632L21.5737 18.5545V19.737L21.1879 19.5143C20.8353 19.3107 20.5496 18.8157 20.5496 18.4087V17.9632Z"
+                  fill="white"
+                />
+                <path
+                  d="M20.5496 17.9629L27.7184 13.824L28.7425 14.4153L21.5737 18.5542L20.5496 17.9629Z"
+                  fill="white"
+                />
+                <path
+                  d="M23.5293 11.4587L24.9391 10.6447C25.2918 10.4412 25.8632 10.4412 26.2158 10.6447L30.6981 13.2326L28.6498 14.4151L23.5293 11.4587Z"
+                  fill="white"
+                />
+                <path
+                  d="M21.5428 18.5529L28.7116 14.4141V15.5966L21.5428 19.7355V18.5529Z"
+                  fill="white"
+                />
+                <path
+                  d="M28.6383 14.3915L30.6866 13.2089V18.3845C30.6866 18.7915 30.4007 19.2865 30.0483 19.4901L28.6383 20.3041V14.3915Z"
+                  fill="white"
+                />
+                <path
+                  d="M9.10252 13.1855L13.5848 10.5976C13.9373 10.3941 14.5088 10.3941 14.8614 10.5976L16.2712 11.4116L11.1507 14.368L9.10252 13.1855Z"
+                  fill="white"
+                />
+                <path
+                  d="M18.2791 18.4834L19.3032 17.8921V18.3376C19.3032 18.7446 19.0175 19.2396 18.6649 19.4432L18.2791 19.6659V18.4834Z"
+                  fill="white"
+                />
+                <path
+                  d="M11.1366 14.3449L18.3054 18.4839V19.6664L11.1366 15.5274V14.3449Z"
+                  fill="white"
+                />
+                <path
+                  d="M9.10252 13.1618L11.1507 14.3444V20.2571L9.74082 19.4431C9.3883 19.2395 9.10252 18.7445 9.10252 18.3375V13.1618Z"
+                  fill="white"
+                />
+                <path
+                  d="M11.1684 14.3861C11.1508 14.3759 11.1508 14.3594 11.1684 14.3493L12.1287 13.7948C12.1464 13.7847 12.1749 13.7847 12.1926 13.7948L19.2975 17.8969C19.3152 17.9071 19.3152 17.9235 19.2975 17.9337L18.3372 18.4881C18.3196 18.4984 18.2911 18.4984 18.2734 18.4881L11.1684 14.3861Z"
+                  fill="white"
+                />
+                <path
+                  d="M28.6383 21.467C28.6383 21.06 28.924 20.565 29.2765 20.3615L30.6864 19.5475V24.2777L28.6383 25.4602V21.467Z"
+                  fill="white"
+                />
+                <path
+                  d="M25.5634 27.9487C25.5634 27.5415 25.8491 27.0467 26.2017 26.8431L30.6838 24.2553V25.8833C30.6838 26.2903 30.3981 26.7853 30.0456 26.9889L25.5634 29.5767V27.9487Z"
+                  fill="white"
+                />
+                <path
+                  d="M9.10252 24.2773L13.5848 26.8651C13.9373 27.0686 14.2231 27.5636 14.2231 27.9707V29.5987L9.74082 27.0109C9.3883 26.8073 9.10252 26.3124 9.10252 25.9053V24.2773Z"
+                  fill="white"
+                />
+                <path
+                  d="M9.10252 19.5475L10.5124 20.3615C10.8649 20.5651 11.1507 21.0601 11.1507 21.4671V25.4602L9.10252 24.2777V19.5475Z"
+                  fill="white"
+                />
+                <path
+                  d="M14.6843 9.94493L17.9614 8.05287L20.0096 9.23541L17.3708 10.7589C17.0184 10.9625 16.4467 10.9625 16.0942 10.7589L14.6843 9.94493Z"
+                  fill="white"
+                />
+                <path
+                  d="M17.8063 8.14792L19.2161 7.33391C19.5687 7.13039 20.1403 7.13039 20.4928 7.33391L25.1798 10.04L23.7699 10.854C23.4175 11.0575 22.8459 11.0575 22.4932 10.854L17.8063 8.14792Z"
+                  fill="white"
+                />
               </svg>
             )}
             <div className="flex flex-col items-start">
               <span className="font-medium">
-                {isConnecting && selectedWallet === 'zelcore' ? 'Check Zelcore App' : 'Zelcore'}
+                {isConnecting && selectedWallet === "zelcore"
+                  ? "Check Zelcore App"
+                  : "Zelcore"}
               </span>
               <span className="text-xs text-muted-foreground">
-                {isConnecting && selectedWallet === 'zelcore' ? 'Waiting for signature...' : 'Multi-asset wallet'}
+                {isConnecting && selectedWallet === "zelcore"
+                  ? "Waiting for signature..."
+                  : "Multi-asset wallet"}
               </span>
             </div>
           </Button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTheme } from "next-themes";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,94 +64,19 @@ import {
   MinusSquare,
   Upload,
 } from "lucide-react";
-import {
-  createHighlighter,
-  type Highlighter,
-  type BundledLanguage,
-} from "shiki";
 import dynamic from "next/dynamic";
 
 // Lazy load Monaco editor - only loads when editing files
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="flex items-center justify-center h-full bg-[#1e1e1e]">
+    <div className="flex items-center justify-center h-full bg-background">
       <Loader2 className="size-8 animate-spin text-primary" />
     </div>
   ),
 });
 
-// Map file extensions to shiki language identifiers
-const extensionToLanguage: Record<string, BundledLanguage> = {
-  // JavaScript/TypeScript
-  js: "javascript",
-  mjs: "javascript",
-  cjs: "javascript",
-  jsx: "jsx",
-  ts: "typescript",
-  tsx: "tsx",
-  // Python
-  py: "python",
-  // Go
-  go: "go",
-  // Systems languages
-  rs: "rust",
-  java: "java",
-  c: "c",
-  cpp: "cpp",
-  h: "c",
-  hpp: "cpp",
-  cs: "csharp",
-  // Data formats
-  json: "json",
-  yaml: "yaml",
-  yml: "yaml",
-  xml: "xml",
-  html: "html",
-  htm: "html",
-  svg: "xml",
-  // Styles
-  css: "css",
-  scss: "scss",
-  sass: "sass",
-  less: "less",
-  // Docs
-  md: "markdown",
-  mdx: "mdx",
-  // Shell/scripts
-  sh: "bash",
-  bash: "bash",
-  zsh: "bash",
-  // Web languages
-  php: "php",
-  rb: "ruby",
-  sql: "sql",
-  graphql: "graphql",
-  gql: "graphql",
-  // Config files
-  dockerfile: "dockerfile",
-  conf: "nginx",
-  nginx: "nginx",
-  ini: "ini",
-  toml: "toml",
-  env: "dotenv",
-  // Makefile
-  makefile: "makefile",
-};
-
-function getLanguageFromFilename(filename: string): BundledLanguage {
-  const ext = filename.split(".").pop()?.toLowerCase() || "";
-  const basename = filename.toLowerCase();
-
-  // Handle special filenames
-  if (basename === "dockerfile") return "dockerfile";
-  if (basename === "makefile") return "makefile";
-  if (basename === ".env" || basename.startsWith(".env.")) return "dotenv";
-
-  return extensionToLanguage[ext] || "plaintext";
-}
-
-// Monaco uses slightly different language IDs
+// Monaco language IDs
 function getMonacoLanguage(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase() || "";
   const basename = filename.toLowerCase();
@@ -209,53 +135,6 @@ function getMonacoLanguage(filename: string): string {
   return monacoLangMap[ext] || "plaintext";
 }
 
-// Singleton highlighter instance
-let highlighterPromise: Promise<Highlighter> | null = null;
-
-function getHighlighter(): Promise<Highlighter> {
-  if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({
-      themes: ["one-dark-pro"],
-      langs: [
-        "javascript",
-        "typescript",
-        "jsx",
-        "tsx",
-        "python",
-        "go",
-        "rust",
-        "java",
-        "c",
-        "cpp",
-        "csharp",
-        "json",
-        "yaml",
-        "xml",
-        "html",
-        "css",
-        "scss",
-        "sass",
-        "less",
-        "markdown",
-        "mdx",
-        "bash",
-        "php",
-        "ruby",
-        "sql",
-        "graphql",
-        "dockerfile",
-        "nginx",
-        "ini",
-        "toml",
-        "makefile",
-        "plaintext",
-        "dotenv",
-      ],
-    });
-  }
-  return highlighterPromise;
-}
-
 interface FileBrowserProps {
   appName: string;
   selectedNode: string;
@@ -293,6 +172,7 @@ function getFileIcon(file: FileInfo) {
 }
 
 export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
+  const { resolvedTheme } = useTheme();
   const [currentPath, setCurrentPath] = useState("/");
   const [editingFile, setEditingFile] = useState<FileInfo | null>(null);
   const [editContent, setEditContent] = useState<string>("");
@@ -300,7 +180,6 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [selectedComponent, setSelectedComponent] = useState<string>("");
-  const [highlighter, setHighlighter] = useState<Highlighter | null>(null);
   const [, setRetryCount] = useState(0);
   const [showRetryHint, setShowRetryHint] = useState(false);
 
@@ -324,7 +203,6 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
       : resolvedNode
         ? [resolvedNode]
         : [];
-  const [highlightedHtml, setHighlightedHtml] = useState<string>("");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteProgress, setDeleteProgress] = useState<{
@@ -343,32 +221,6 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
     failed: string[];
   } | null>(null);
   const { zelidauth } = useAuthStore();
-
-  // Load shiki highlighter on mount
-  useEffect(() => {
-    getHighlighter().then(setHighlighter);
-  }, []);
-
-  // Update highlighted HTML when content or file changes
-  useEffect(() => {
-    if (highlighter && editContent && editingFile) {
-      const lang = getLanguageFromFilename(editingFile.name);
-      try {
-        const html = highlighter.codeToHtml(editContent, {
-          lang,
-          theme: "one-dark-pro",
-        });
-        setHighlightedHtml(html);
-      } catch {
-        // Fallback to plaintext if language not supported
-        const html = highlighter.codeToHtml(editContent, {
-          lang: "plaintext",
-          theme: "one-dark-pro",
-        });
-        setHighlightedHtml(html);
-      }
-    }
-  }, [highlighter, editContent, editingFile]);
 
   // Fetch app specification to get component names
   const { data: specData, isLoading: specLoading } = useQuery({
@@ -1022,41 +874,10 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
             </SheetDescription>
           </SheetHeader>
 
-          {isLoadingFile || !highlighter ? (
+          {isLoadingFile ? (
             <div className="flex items-center justify-center flex-1">
               <Loader2 className="size-8 animate-spin text-primary" />
             </div>
-          ) : isViewOnly ? (
-            <ScrollArea className="flex-1 border">
-              <div
-                className="shiki-wrapper"
-                style={{ fontSize: "0.75rem" }}
-                dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-              />
-              <style jsx global>{`
-                .shiki-wrapper pre {
-                  margin: 0;
-                  padding: 1rem;
-                  background: transparent !important;
-                  overflow-x: auto;
-                }
-                .shiki-wrapper code {
-                  counter-reset: line;
-                }
-                .shiki-wrapper .line {
-                  display: flex;
-                }
-                .shiki-wrapper .line::before {
-                  counter-increment: line;
-                  content: counter(line);
-                  min-width: 2.5em;
-                  padding-right: 1em;
-                  color: #636d83;
-                  text-align: right;
-                  user-select: none;
-                }
-              `}</style>
-            </ScrollArea>
           ) : (
             <div className="flex-1 border overflow-hidden">
               <MonacoEditor
@@ -1068,8 +889,9 @@ export function FileBrowser({ appName, selectedNode }: FileBrowserProps) {
                 }
                 value={editContent}
                 onChange={(value) => setEditContent(value || "")}
-                theme="vs-dark"
+                theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
                 options={{
+                  readOnly: isViewOnly,
                   minimap: { enabled: false },
                   fontSize: 13,
                   lineNumbers: "on",
