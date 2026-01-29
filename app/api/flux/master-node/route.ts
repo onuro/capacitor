@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMasterFromFdm, toFluxApiPort } from '@/lib/flux-fdm';
+import { getMasterFromFdm } from '@/lib/flux-fdm';
 import { detectMasterNode } from '@/lib/flux-haproxy';
+import { fetchPortMap, resolvePort } from '@/lib/flux-status';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,6 +10,8 @@ export const revalidate = 0;
  * Get the master node IP for a Flux app.
  * Primary: FDM (Flux Domain Manager) - works for ALL apps
  * Fallback: HAProxy statistics - only works for apps with domains
+ *
+ * Uses the app's /status endpoint to resolve correct Flux API ports.
  */
 export async function GET(request: NextRequest) {
   const appName = request.nextUrl.searchParams.get('appName');
@@ -23,18 +26,20 @@ export async function GET(request: NextRequest) {
   try {
     console.log(`[master-node] Detecting master for ${appName}...`);
 
-    // Primary: Try FDM first (works for ALL apps)
-    const fdmResult = await getMasterFromFdm(appName, 8000);
+    // Fetch FDM and port map in parallel
+    const [fdmResult, portMap] = await Promise.all([
+      getMasterFromFdm(appName, 8000),
+      fetchPortMap(appName),
+    ]);
 
     if (fdmResult.masterIp) {
-      // Convert app port to Flux API port
-      const masterApiPort = toFluxApiPort(fdmResult.masterIp);
-      console.log(`[master-node] Found master via FDM for ${appName}: ${masterApiPort}`);
+      const masterResolved = resolvePort(fdmResult.masterIp, portMap);
+      console.log(`[master-node] Found master via FDM for ${appName}: ${masterResolved}`);
       return NextResponse.json({
         status: 'success',
         data: {
-          masterIp: masterApiPort,
-          allIps: fdmResult.allIps.map(toFluxApiPort),
+          masterIp: masterResolved,
+          allIps: fdmResult.allIps.map((ip) => resolvePort(ip, portMap)),
           appName,
           region: fdmResult.region,
           source: 'fdm',
@@ -47,12 +52,13 @@ export async function GET(request: NextRequest) {
     const haproxyMaster = await detectMasterNode(appName, 8000);
 
     if (haproxyMaster) {
-      console.log(`[master-node] Found master via HAProxy for ${appName}: ${haproxyMaster}`);
+      const masterResolved = resolvePort(haproxyMaster, portMap);
+      console.log(`[master-node] Found master via HAProxy for ${appName}: ${masterResolved}`);
       return NextResponse.json({
         status: 'success',
         data: {
-          masterIp: haproxyMaster,
-          allIps: [haproxyMaster],
+          masterIp: masterResolved,
+          allIps: [masterResolved],
           appName,
           source: 'haproxy',
         },

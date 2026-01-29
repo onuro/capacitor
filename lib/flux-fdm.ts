@@ -112,17 +112,6 @@ export async function getMasterFromFdm(
   return { masterIp: null, allIps: [], region: null };
 }
 
-/**
- * Convert FDM IP format (IP:port or just IP) to the correct Flux API port.
- * FDM returns app ports, but we need the Flux API port (16xxx).
- *
- * @param ipPort - IP:port string from FDM
- * @returns IP:16127 format for Flux API access
- */
-export function toFluxApiPort(ipPort: string): string {
-  const ip = ipPort.split(":")[0];
-  return `${ip}:16127`;
-}
 
 /**
  * Universal master node detection for server-side use.
@@ -209,25 +198,3 @@ export async function detectMaster(
   }
 }
 
-/**
- * Find the full IP:port for a master IP by matching against known node IPs.
- * This is needed because FDM returns just the IP, but we need the correct port.
- *
- * @param masterIp - Master IP (without port) from detectMaster
- * @param nodeIps - Array of known node IP:port strings from client
- * @returns The matching IP:port or IP:16127 as fallback
- */
-export function findMasterInNodes(
-  masterIp: string,
-  nodeIps: string[],
-): string | null {
-  // Find the node that matches the master IP
-  for (const nodeIpPort of nodeIps) {
-    const nodeIp = nodeIpPort.split(":")[0];
-    if (nodeIp === masterIp) {
-      return nodeIpPort;
-    }
-  }
-  // If no match found in provided nodes, return with default port
-  return `${masterIp}:16127`;
-}

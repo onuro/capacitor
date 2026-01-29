@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getMasterFromFdm, toFluxApiPort } from "@/lib/flux-fdm";
+import { getMasterFromFdm } from "@/lib/flux-fdm";
 
 // Disable caching for this API route
 export const dynamic = "force-dynamic";
@@ -186,32 +186,27 @@ export async function GET(request: NextRequest) {
   console.log("Node IPs received:", ips);
 
   // Detect master node via FDM and prioritize it
+  // Client-provided IPs now include correct ports from cluster status,
+  // so we match by bare IP rather than fabricating a new IP:PORT.
   const fdmResult = await getMasterFromFdm(appName, 5000);
   if (fdmResult.masterIp) {
-    const masterApiPort = toFluxApiPort(fdmResult.masterIp);
-    console.log(`[Stats] Master detected via FDM: ${masterApiPort}`);
+    const masterBareIp = fdmResult.masterIp.split(":")[0];
+    console.log(`[Stats] Master detected via FDM: ${masterBareIp}`);
 
-    // Check if master is already in the list
+    // Find master in client-provided IPs by bare IP match
     const masterIndex = ips.findIndex((ip) =>
-      ip.includes(masterApiPort.split(":")[0]),
+      ip.startsWith(masterBareIp + ":") || ip === masterBareIp,
     );
     if (masterIndex > 0) {
-      // Move master to front
-      ips.splice(masterIndex, 1);
-      ips.unshift(masterApiPort);
+      // Move master to front (keep its correct port from the client list)
+      const [masterEntry] = ips.splice(masterIndex, 1);
+      ips.unshift(masterEntry);
       console.log("[Stats] Moved master to front of list");
-    } else if (masterIndex === -1) {
-      // Master not in client list, add it first
-      ips.unshift(masterApiPort);
-      console.log("[Stats] Added master to front of list");
     }
+    // If masterIndex === -1, master is not in client list -- don't add with guessed port
   } else {
     console.log("[Stats] FDM detection failed, using client-provided order");
   }
-
-  // console.log('Node IPs after master detection:', ips);
-  // console.log('Container names to try:', containerNames);
-  // console.log('Starting node iteration...');
 
   // Build headers once
   const headers: Record<string, string> = {
@@ -309,13 +304,6 @@ export async function GET(request: NextRequest) {
             },
             nodeIp,
             containerName,
-            // Debug: include raw data for verification
-            _debug: {
-              rawMemoryUsage: data.data.memory_stats?.usage,
-              rawMemoryLimit: data.data.memory_stats?.limit,
-              rawContainerName: data.data.name,
-              queriedUrl: nodeUrl,
-            },
           });
         }
       } catch (error) {

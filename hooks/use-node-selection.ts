@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getAppLocations, type AppLocation } from "@/lib/api/flux-apps";
+import { getAppLocations, getAppClusterStatus, type AppLocation } from "@/lib/api/flux-apps";
 import { getMasterNode } from "@/lib/api/flux-node-detect";
 import { formatNodeAddress, isSameNodeIp } from "@/lib/utils";
 
@@ -29,7 +29,8 @@ export interface UseNodeSelectionResult {
 
 /**
  * Unified hook for node selection across all components.
- * Detects master node via HAProxy statistics (act=1 is master).
+ * Fetches cluster status to get correct Flux API ports for each node,
+ * then enriches location data so all downstream consumers get correct IP:PORT.
  */
 export function useNodeSelection({
   appName,
@@ -46,9 +47,29 @@ export function useNodeSelection({
 
   const locations = locationsData?.data || [];
 
-  // Sort locations by broadcastedAt (earliest first)
+  // Fetch cluster status for correct port mapping
+  const { data: clusterData } = useQuery({
+    queryKey: ["appClusterStatus", appName],
+    queryFn: () => getAppClusterStatus(appName),
+    enabled: !!appName,
+    staleTime: 30000,
+  });
+
+  const portMap = clusterData?.data?.portMap || {};
+  const clusterMasterIP = clusterData?.data?.masterIP || null;
+
+  // Enrich locations with correct ports from cluster status, then sort
   const sortedLocations = useMemo(() => {
-    return [...locations].sort((a, b) => {
+    const enriched = locations.map((loc) => {
+      const bareIp = loc.ip.includes(":") ? loc.ip.split(":")[0] : loc.ip;
+      const correctPort = portMap[bareIp];
+      if (correctPort) {
+        return { ...loc, port: correctPort };
+      }
+      return loc;
+    });
+
+    return enriched.sort((a, b) => {
       const timeA = new Date(a.broadcastedAt).getTime();
       const timeB = new Date(b.broadcastedAt).getTime();
       const timeDiff = timeA - timeB;
@@ -57,9 +78,9 @@ export function useNodeSelection({
       }
       return timeDiff;
     });
-  }, [locations]);
+  }, [locations, portMap]);
 
-  // Get master node from HAProxy stats (returns IP:port with correct Flux API port)
+  // Get master node from FDM/HAProxy
   const { data: masterNodeData, isLoading: masterLoading } = useQuery({
     queryKey: ["masterNode", appName],
     queryFn: () => getMasterNode(appName),
@@ -67,8 +88,24 @@ export function useNodeSelection({
     staleTime: 30000,
   });
 
-  // HAProxy returns full IP:port with correct Flux API port
-  const masterNodeAddress = masterNodeData?.data?.masterIp || null;
+  // Derive master node address with correct port
+  const masterNodeAddress = useMemo(() => {
+    // Primary: use FDM master IP, but fix the port from cluster status
+    const fdmMasterIp = masterNodeData?.data?.masterIp || null;
+    if (fdmMasterIp) {
+      const bareIp = fdmMasterIp.split(":")[0];
+      const correctPort = portMap[bareIp];
+      return correctPort ? `${bareIp}:${correctPort}` : fdmMasterIp;
+    }
+
+    // Fallback: use masterIP from cluster status
+    if (clusterMasterIP) {
+      const correctPort = portMap[clusterMasterIP];
+      return correctPort ? `${clusterMasterIP}:${correctPort}` : null;
+    }
+
+    return null;
+  }, [masterNodeData, portMap, clusterMasterIP]);
 
   // Auto-select node when locations load
   useEffect(() => {

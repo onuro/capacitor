@@ -90,8 +90,7 @@ export function useResolvedNode(appName: string, selectedNode: string) {
   });
 
   if (selectedNode === "auto") {
-    // Prefer master node, but use the correct port from locations
-    // (masterNodeAddress from FDM may have wrong port due to toFluxApiPort)
+    // Prefer master node with correct port from cluster status
     if (masterNodeAddress && sortedLocations.length > 0) {
       const masterFromLocations = sortedLocations.find((loc) =>
         isSameNodeIp(formatNodeAddress(loc), masterNodeAddress),

@@ -261,3 +261,47 @@ export async function getAppPermanentMessages(
   );
   return response.data;
 }
+
+// ============================================
+// Cluster Status (correct node port detection)
+// ============================================
+
+export interface ClusterStatusNode {
+  ip: string;
+  active: boolean;
+  seqNo?: number;
+  staticIp?: boolean;
+  osUptime?: number;
+  masterIP?: string;
+}
+
+export interface AppClusterStatus {
+  appName: string;
+  masterIP: string | null;
+  portMap: Record<string, number>;
+  clusterStatus: ClusterStatusNode[];
+}
+
+/**
+ * Get cluster status for a Flux app.
+ * Returns the correct Flux API port for each node via the app's /status endpoint.
+ */
+export async function getAppClusterStatus(
+  appName: string
+): Promise<FluxApiResponse<AppClusterStatus>> {
+  try {
+    const response = await fetch(
+      `/api/flux/app-status?appName=${encodeURIComponent(appName)}`,
+      {
+        method: 'GET',
+        signal: AbortSignal.timeout(12000),
+      }
+    );
+    return response.json();
+  } catch (error) {
+    return {
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Failed to get cluster status',
+    };
+  }
+}

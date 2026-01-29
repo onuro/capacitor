@@ -100,12 +100,17 @@ function parseSocketOutput(output: string): string {
   // Filter out:
   // - Lines starting with # (shell prompts)
   // - Empty lines at start/end
+  // - PHP diagnostic lines (warnings, notices, errors from stderr)
   const contentLines = lines.filter((line) => {
     const trimmed = line.trim();
     // Skip command echo line (starts with #)
     if (trimmed.startsWith('#')) return false;
     // Skip empty lines
     if (trimmed === '') return false;
+    // Skip PHP diagnostic output (e.g., "[29-Jan-2026 09:36:08 UTC] PHP Warning: ...")
+    if (/^\[.*\]\s*PHP\s+(Warning|Notice|Fatal error|Deprecated|Parse error|Strict Standards):/.test(trimmed)) return false;
+    // Also skip PHP diagnostics without timestamp prefix
+    if (/^PHP\s+(Warning|Notice|Fatal error|Deprecated|Parse error|Strict Standards):/.test(trimmed)) return false;
     return true;
   });
 
@@ -147,6 +152,17 @@ async function executeWpCommand<T>(
         const parsed = JSON.parse(cleanOutput);
         return { status: 'success', data: parsed as T };
       } catch {
+        // Direct parse failed — try extracting JSON substring from output
+        // This handles cases where non-JSON text (e.g. PHP warnings) wasn't fully filtered
+        const jsonMatch = cleanOutput.match(/\[\s*\{[\s\S]*\}\s*\]|\[\s*\]|\{"[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            return { status: 'success', data: parsed as T };
+          } catch {
+            // Fall through to return as string
+          }
+        }
         // Return as string if not JSON
         return { status: 'success', data: cleanOutput as T };
       }

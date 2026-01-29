@@ -171,7 +171,9 @@ function executeViaSocket(
 
             // Check for JSON completion
             if (isJsonCommand) {
-              const jsonMatch = output.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
+              // Look for JSON arrays starting with [{ or empty [], or JSON objects starting with {"
+              // Avoids matching PHP warning timestamps like [29-Jan-2026 09:36:08 UTC]
+              const jsonMatch = output.match(/\[\s*\{[\s\S]*\}\s*\]|\[\s*\]|\{"[\s\S]*\}/);
               if (jsonMatch) {
                 try {
                   JSON.parse(jsonMatch[0]);
@@ -180,9 +182,13 @@ function executeViaSocket(
                   // JSON not complete yet
                 }
               }
+              // For JSON commands, do NOT use text pattern matching (Success:/Error:/Warning:)
+              // PHP warnings and WP-CLI messages arrive before the JSON output,
+              // causing premature completion that cuts off the actual data.
+              return false;
             }
 
-            // Check for WP CLI success/error patterns
+            // Check for WP CLI success/error patterns (non-JSON commands only)
             if (output.includes('Success:') || output.includes('Error:') || output.includes('Warning:')) {
               return true;
             }

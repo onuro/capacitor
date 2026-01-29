@@ -153,15 +153,18 @@ export async function getAppHashes(
 }
 
 /**
- * Check if app is running on a specific node
+ * Check if app is running on a specific node.
+ * Accepts both bare IP and IP:PORT formats.
  */
 export async function checkAppRunning(
   nodeIp: string,
   appName: string
 ): Promise<boolean> {
   try {
+    const hasPort = nodeIp.includes(':');
+    const baseUrl = hasPort ? `http://${nodeIp}` : `http://${nodeIp}:16127`;
     const response = await apiClient.get<FluxApiResponse<boolean>>(
-      `http://${nodeIp}:16127/apps/checkrunning/${appName}`,
+      `${baseUrl}/apps/checkrunning/${appName}`,
       { timeout: 10000 }
     );
     return response.data.status === 'success' && response.data.data === true;
